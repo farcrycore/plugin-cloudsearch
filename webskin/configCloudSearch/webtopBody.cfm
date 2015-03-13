@@ -22,20 +22,29 @@
 
 <cfif application.fc.lib.cloudsearch.isEnabled()>
 	<cfset qDomains = application.fc.lib.cloudsearch.getDomains() />
+	<cfset qIndexFields = application.fc.lib.cloudsearch.getIndexFields() />
+	<cfset qDiffIndexFields = application.fc.lib.cloudsearch.diffIndexFields() />
 
 	<cfoutput>
-		<h2>Search Domains Found</h2>
+		<h2>Search Domains</h2>
 		<table class="table table-striped">
 			<thead>
-				<th>Domain</th>
-				<th>Created</th>
-				<th>Processing Index</th>
-				<th>Requires Index</th>
-				<th>Deleted</th>
-				<th>Instance Count</th>
-				<th>Instance Type</th>
+				<tr>
+					<th>Domain</th>
+					<th>Created</th>
+					<th>Processing Index</th>
+					<th>Requires Index</th>
+					<th>Deleted</th>
+					<th>Instance Count</th>
+					<th>Instance Type</th>
+					<th></th>
+				</tr>
 			</thead>
 			<tbody>
+				<cfif not qDomains.recordcount>
+					<tr class="warning"><td colspan="7">No search domains have been set up in AWS</td></tr>
+				</cfif>
+
 				<cfloop query="qDomains">
 					<tr>
 						<td>#qDomains.domain#</td>
@@ -45,10 +54,223 @@
 						<td>#yesnoformat(qDomains.deleted)#</td>
 						<td>#qDomains.instance_count#</td>
 						<td>#qDomains.instance_type#</td>
+						<td><a class="cloudsearch-domain-action" data-confirm="Are you sure you want to re-index #qDomains.domain#?" href="#application.fapi.getLink(type='configCloudSearch',view='webtopAjaxIndexDocuments',urlParameters='domain=#qDomains.domain#')#">Index</a>
 					</tr>
 				</cfloop>
 			</tbody>
 		</table>
+		<div id="cloudsearch-domain-results"></div>
+
+		<h2>Index Fields</h2>
+		<table class="table table-striped">
+			<thead>
+				<tr>
+					<th>Field</th>
+					<th>Type <a target="_blank" href="http://docs.aws.amazon.com/cloudsearch/latest/developerguide/configuring-index-fields.html"><i class="fa fa-question-o"></i></a></th>
+					<th>Default</th>
+					<th>Return</th>
+					<th>Search</th>
+					<th>Facet</th>
+					<th>Sort</th>
+					<th>Highlight</th>
+					<th>Analysis Scheme</th>
+					<th>Pending Deletion</th>
+					<th>State</th>
+				</tr>
+			</thead>
+			<tbody>
+				<cfif not qIndexFields.recordcount>
+					<tr class="warning"><td colspan="11">No index fields have been set up in AWS</td></tr>
+				</cfif>
+				
+				<cfloop query="qIndexFields">
+					<tr>
+						<td>#qIndexFields.field#</td>
+						<td>#qIndexFields.type#</td>
+						<td>#qIndexFields.default_value#</td>
+						<td>#yesNoFormat(qIndexFields.return)#</td>
+						<td>#yesNoFormat(qIndexFields.search)#</td>
+						<td>#yesNoFormat(qIndexFields.facet)#</td>
+						<td>#yesNoFormat(qIndexFields.sort)#</td>
+						<td>#yesNoFormat(qIndexFields.highlight)#</td>
+						<td>#qIndexFields.analysis_scheme#</td>
+						<td>#yesNoFormat(qIndexFields.pending_deletion)#</td>
+						<td>#qIndexFields.state#</td>
+					</tr>
+				</cfloop>
+			</tbody>
+		</table>
+
+		<cfif qDiffIndexFields.recordcount>
+			<h2>Updates Required</h2>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Type <a target="_blank" href="http://docs.aws.amazon.com/cloudsearch/latest/developerguide/configuring-index-fields.html"><i class="fa fa-question-o"></i></a></th>
+						<th>Default</th>
+						<th>Return</th>
+						<th>Search</th>
+						<th>Facet</th>
+						<th>Sort</th>
+						<th>Highlight</th>
+						<th>Analysis Scheme</th>
+						<th>Action</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					<cfloop query="qDiffIndexFields">
+						<tr>
+							<td>#qDiffIndexFields.field#</td>
+							<td>#qDiffIndexFields.type#</td>
+							<td>#qDiffIndexFields.default_value#</td>
+							<td>#yesNoFormat(qDiffIndexFields.return)#</td>
+							<td>#yesNoFormat(qDiffIndexFields.search)#</td>
+							<td>#yesNoFormat(qDiffIndexFields.facet)#</td>
+							<td>#yesNoFormat(qDiffIndexFields.sort)#</td>
+							<td>#yesNoFormat(qDiffIndexFields.highlight)#</td>
+							<td>#qDiffIndexFields.analysis_scheme#</td>
+							<td>#qDiffIndexFields.action#</td>
+							<td>
+								<cfif listFindNoCase("add,update,delete",qDiffIndexFields.action)>
+									<a class="cloudsearch-field-action" href="#application.fapi.getLink(type='configCloudSearch',view='webtopAjaxApply',urlParameters='field=#qDiffIndexFields.field#')#">apply</a>
+								<cfelse>
+									<a class="cloudsearch-field-action" href="#application.fapi.getLink(type='configCloudSearch',view='webtopAjaxApply',urlParameters='field=#qDiffIndexFields.field#')#">refresh</a>
+								</cfif>
+							</td>
+						</tr>
+					</cfloop>
+				</tbody>
+			</table>
+			<div id="cloudsearch-update-results"></div>
+
+			<script type="text/javascript">
+				$j(document).on("click",".cloudsearch-domain-action", function(e){
+					var self = $j(this), confirmText = self.data("confirm"), url = this.href;
+
+					e.preventDefault();
+					e.stopPropagation();
+
+					if (confirmText && confirmText.length && !window.confirm(confirmText)){
+						return;
+					}
+
+					function showAlert(status, message){
+						$j("##cloudsearch-domain-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
+					}
+
+					$j.ajax({
+						type : "GET",
+						dataType : "json",
+						url : url, 
+						success : function(data){
+							if (data.errors.length){
+								for (var i=0; i<data.errors.length; i++){
+									showAlert("error", data.errors[i].message);
+								}
+							}
+
+							if (data.message.length){
+								showAlert("info", data.message);
+							}
+
+							if (data.html.length){
+								showAlert("info",data.html);
+							}
+						},
+						error : function(jqXHR, textStatus, errorThrown){
+							var fallback = true, data = {};
+
+							try {
+								data = JSON.parse(jqXHR.responseText);
+								if (data.errors.length){
+									for (var i=0; i<data.errors.length; i++){
+										showAlert("error", data.errors[i].message);
+									}
+									fallback = false;
+								}
+								else if (data.error){
+									showAlert("error", data.error.message);
+									fallback = false;
+								}
+							}
+							catch(e){}
+
+							if (fallback){
+								if (jqXHR.status === 403) {
+									showAlert("error", "Access Forbidden - your session may have timed out");
+								}
+								else {
+									showAlert("error", errorThrown);
+								}
+							}
+						}
+					});
+				});
+
+				$j(document).on("click",".cloudsearch-field-action", function(e){
+					var self = $j(this), tr = self.closest("tr"), url = this.href;
+
+					e.preventDefault();
+					e.stopPropagation();
+
+					self.closest("td").html("...");
+
+					function showAlert(status, message){
+						$j("##cloudsearch-update-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
+					}
+
+					$j.ajax({
+						type : "GET",
+						dataType : "json",
+						url : url, 
+						success : function(data){
+							if (data.errors.length){
+								for (var i=0; i<data.errors.length; i++){
+									showAlert("error", data.errors[i].message);
+								}
+							}
+
+							if (data.message.length){
+								showAlert("info", data.message);
+							}
+
+							if (data.html.length){
+								tr.replaceWith(data.html);
+							}
+						},
+						error : function(jqXHR, textStatus, errorThrown){
+							var fallback = true, data = {};
+
+							try {
+								data = JSON.parse(jqXHR.responseText);
+								if (data.errors.length){
+									for (var i=0; i<data.errors.length; i++){
+										showAlert("error", data.errors[i].message);
+									}
+									fallback = false;
+								}
+								else if (data.error){
+									showAlert("error", data.error.message);
+									fallback = false;
+								}
+							}
+							catch(e){}
+
+							if (fallback){
+								if (jqXHR.status === 403) {
+									showAlert("error", "Access Forbidden - your session may have timed out");
+								}
+								else {
+									showAlert("error", errorThrown);
+								}
+							}
+						}
+					});
+				});
+			</script>
+		</cfif>
 	</cfoutput>
 </cfif>
 

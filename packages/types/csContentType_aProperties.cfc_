@@ -1,4 +1,4 @@
-<cfcomponent output="false" extends="farcry.core.packages.types.types" displayname="CloudSearch Indexed Property" hint="Manages indexed properties for a content type" bFriendly="false" bObjectBroker="false">
+<cfcomponent output="false" extends="farcry.core.packages.types.types" displayname="CloudSearch Indexed Property" hint="Manages indexed properties for a content type" bFriendly="false" bObjectBroker="false" bSystem="true">
 
 	<cfproperty name="fieldName" type="string" required="true" 
 		ftSeq="1" ftFieldset="Indexed Property" ftLabel="Field"
