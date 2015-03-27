@@ -332,21 +332,31 @@ component {
 		var uploadDocumentsRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.UploadDocumentsRequest").init();
 		var uploadDocumentsResponse = {};
 		var contentType = createobject("java","com.amazonaws.services.cloudsearchdomain.model.ContentType").fromValue("application/json")
-		var inputStream = createobject("java","java.io.StringBufferInputStream").init(arguments.documents);
+		var inputStream = "";
 		var aWarnings = [];
 		var warning = {};
+		var id = application.fapi.getUUID();
+		var documentFile = "";
 
 		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
 			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
 		}
 
+		// create temporary file for streaming into the SDK
+		application.fc.lib.cdn.ioWriteFile(location="temp",file="/cloudsearch/documents-#id#.json",data=arguments.documents);
+		documentFile = application.fc.lib.cdn.ioGetFileLocation(location="temp",file="/cloudsearch/documents-#id#.json",bRetrieve=true).path;
+		inputStream = createobject("java","java.io.FileInputStream").init(documentFile);
+			
 		csdClient = getClient("domain", arguments.domain);
 
 		uploadDocumentsRequest.setDocuments(inputStream);
-		uploadDocumentsRequest.setContentLength(len(documents));
+		uploadDocumentsRequest.setContentLength(getFileInfo(documentFile).size);
 		uploadDocumentsRequest.setContentType(contentType);
 
 		uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
+
+		// remove temporary file
+		application.fc.lib.cdn.ioDeleteFile(location="temp",file="/cloudsearch/documents-#id#.json");
 
 		for (warning in uploadDocumentsResponse.getWarnings()){
 			arrayAppend(aWarnings,warning.getMessage());

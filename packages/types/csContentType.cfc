@@ -318,10 +318,41 @@
 		<cfreturn qResult />
 	</cffunction>
 
+	<cffunction name="getRecordsToUpdate" access="public" output="false" returntype="query">
+		<cfargument name="typename" type="string" required="true" />
+		<cfargument name="builtToDate" type="string" required="false" />
+		<cfargument name="maxRows" type="numeric" required="false" default="-1" />
+
+		<cfset var qContent = "" />
+
+		<cfquery datasource="#application.dsn#" name="qContent" maxrows="#arguments.maxrows#">
+			select 		objectid, datetimeLastUpdated, '#arguments.typename#' as typename, 'updated' as operation
+			from 		#application.dbowner##arguments.typename#
+			<cfif application.fapi.showFarcryDate(arguments.builtToDate)>
+				where 	datetimeLastUpdated > <cfqueryparam cfsqltype="cf_sql_timestamp" value="#arguments.builtToDate#">
+			</cfif>
+
+			UNION
+
+			select 		archiveID as objectid, datetimeCreated as datetimeLastUpdated, '#arguments.typename#' as typename, 'deleted' as operation
+			from 		#application.dbowner#dmArchive
+			where 		objectTypename = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.typename#" />
+						and bDeleted = <cfqueryparam cfsqltype="cf_sql_bit" value="1" />
+						<cfif application.fapi.showFarcryDate(arguments.builtToDate)>
+							and datetimeLastUpdated > <cfqueryparam cfsqltype="cf_sql_timestamp" value="#arguments.builtToDate#">
+						</cfif>
+
+			order by 	datetimeLastUpdated asc
+		</cfquery>
+
+		<cfreturn qContent />
+	</cffunction>
+
 	<cffunction name="bulkImportIntoCloudSearch" access="public" output="false" returntype="struct">
 		<cfargument name="objectid" type="uuid" required="false" />
 		<cfargument name="stObject" type="struct" required="false" />
 		<cfargument name="maxRows" type="numeric" required="false" default="-1" />
+		<cfargument name="requestSize" type="numeric" required="false" default="5000000" />
 
 		<cfset var qContent = "" />
 		<cfset var oContent = "" />
@@ -335,27 +366,30 @@
 		</cfif>
 
 		<cfset oContent = application.fapi.getContentType(typename=arguments.stObject.contentType) />
-
-		<cfif application.fapi.showFarcryDate(arguments.stObject.builtToDate)>
-			<cfset qContent = application.fapi.getContentObjects(typename=arguments.stObject.contentType, lProperties="objectid,datetimeLastUpdated", datetimeLastUpdated_gt=arguments.stObject.builtToDate, orderBy="datetimeLastUpdated asc", maxrows=arguments.maxRows)/>
-		<cfelse>
-			<cfset qContent = application.fapi.getContentObjects(typename=arguments.stObject.contentType, lProperties="objectid,datetimeLastUpdated", orderBy="datetimeLastUpdated asc", maxrows=arguments.maxRows)/>
-		</cfif>
+		<cfset qContent = getRecordsToUpdate(typename=arguments.stObject.contentType,builtToDate=arguments.stObject.builtToDate,maxRows=arguments.maxRows) />
+		<cfset builtToDate = arguments.stObject.builtToDate />
 
 		<cfset strOut.append("[") />
 
 		<cfloop query="qContent">
-			<cfset stContent = getCloudsearchDocument(stObject=oContent.getData(objectid=qContent.objectid)) />
-			
-			<cfset strOut.append('{"type":"add","id":"') />
-			<cfset strOut.append(qContent.objectid) />
-			<cfset strOut.append('","fields":') />
-			<cfset strOut.append(serializeJSON(stContent)) />
-			<cfset strOut.append('}') />
+			<cfif qContent.operation eq "updated">
+				<cfset stContent = getCloudsearchDocument(stObject=oContent.getData(objectid=qContent.objectid)) />
+				
+				<cfset strOut.append('{"type":"add","id":"') />
+				<cfset strOut.append(qContent.objectid) />
+				<cfset strOut.append('","fields":') />
+				<cfset strOut.append(serializeJSON(stContent)) />
+				<cfset strOut.append('}') />
+			<cfelseif qContent.operation eq "deleted">
+				<cfset strOut.append('{"type":"delete","id":"') />
+				<cfset strOut.append(qContent.objectid) />
+				<cfset strOut.append('"}') />
+			</cfif>
 
-			<cfif strOut.length() * (qContent.currentrow / (qContent.currentrow+1)) gt 5000000 or qContent.currentrow eq qContent.recordcount>
+			<cfif strOut.length() * (qContent.currentrow / (qContent.currentrow+1)) gt arguments.requestSize or qContent.currentrow eq qContent.recordcount>
 				<cfset builtToDate = qContent.datetimeLastUpdated />
 				<cfset count = qContent.currentrow />
+				<cfbreak />
 			<cfelse>
 				<cfset strOut.append(",") />
 			</cfif>
@@ -363,13 +397,16 @@
 
 		<cfset strOut.append("]") />
 
-		<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
+		<cfif count>
+			<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
+			<cfset arguments.stObject.builtToDate = builtToDate />
+			<cfset setData(stProperties=arguments.stObject) />
+			<cflog file="cloudsearch" text="Updated #count# #arguments.stObject.contentType# records" />
+		</cfif>
 
 		<cfset stResult["typename"] = arguments.stObject.contentType />
 		<cfset stResult["count"] = count />
 		<cfset stResult["builtToDate"] = builtToDate />
-		<cfset arguments.stObject.builtToDate = builtToDate />
-		<cfset setData(stProperties=arguments.stObject) />
 
 		<cfreturn stResult />
 	</cffunction>
@@ -396,89 +433,98 @@
 		<cfset stFields = application.fc.lib.cloudsearch.getTypeIndexFields(arguments.stObject.typename) />
 
 		<cfloop collection="#stFields#" item="field">
-			<cfset property = stFields[field].property />
+			<cftry>
+				<cfset property = stFields[field].property />
 
-			<!--- If there is a function in the type for this property, use that instead of the default --->
-			<cfif structKeyExists(oType,"getCloudsearch#property#")>
-				<cfinvoke component="#oType#" method="getCloudsearch#property#" returnvariable="item">
-					<cfinvokeargument name="stObject" value="#arguments.stObject#" />
-					<cfinvokeargument name="property" value="#property#" />
-					<cfinvokeargument name="stIndexField" value="#stFields[field]#" />
-				</cfinvoke>
+				<!--- If there is a function in the type for this property, use that instead of the default --->
+				<cfif structKeyExists(oType,"getCloudsearch#property#")>
+					<cfinvoke component="#oType#" method="getCloudsearch#property#" returnvariable="item">
+						<cfinvokeargument name="stObject" value="#arguments.stObject#" />
+						<cfinvokeargument name="property" value="#property#" />
+						<cfinvokeargument name="stIndexField" value="#stFields[field]#" />
+					</cfinvoke>
 
-				<cfset stResult[field] = item />
-				<cfcontinue />
-			</cfif>
+					<cfset stResult[field] = item />
+					<cfcontinue />
+				</cfif>
 
-			<cfswitch expression="#stFields[field].type#">
-				<cfcase value="date">
-					<cfset stResult[field] = application.fc.lib.cloudsearch.getRFC3339Date(arguments.stObject[property]) />
-				</cfcase>
-				<cfcase value="date-array">
-					<cfset stResult[field] = [] />
+				<cfswitch expression="#stFields[field].type#">
+					<cfcase value="date">
+						<cfset stResult[field] = application.fc.lib.cloudsearch.getRFC3339Date(arguments.stObject[property]) />
+					</cfcase>
+					<cfcase value="date-array">
+						<cfset stResult[field] = [] />
 
-					<cfif isSimpleValue(arguments.stObject[property])>
-						<cfloop list="#arguments.stObject[property]#" index="item">
-							<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
+						<cfif isSimpleValue(arguments.stObject[property])>
+							<cfloop list="#arguments.stObject[property]#" index="item">
+								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
+							</cfloop>
+						<cfelse>
+							<cfloop array="#arguments.stObject[property]#" index="item">
+								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
+							</cfloop>
+						</cfif>
+					</cfcase>
+
+					<cfcase value="double">
+						<cfset stResult[field] = arguments.stObject[property] />
+					</cfcase>
+					<cfcase value="double-array">
+						<cfif isSimpleValue(arguments.stObject[property])>
+							<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+						<cfelse>
+							<cfset stResult[field] = arguments.stObject[property] />
+						</cfif>
+					</cfcase>
+
+					<cfcase value="int">
+						<cfset stResult[field] = int(arguments.stObject[property]) />
+					</cfcase>
+					<cfcase value="int-array">
+						<cfif isSimpleValue(arguments.stObject[property])>
+							<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+						<cfelse>
+							<cfset stResult[field] = arguments.stObject[property] />
+						</cfif>
+						<cfloop from="1" to="#arraylen(stResult[field])#" index="i">
+							<cfset stResult[field][i] = int(stResult[field][i]) />
 						</cfloop>
-					<cfelse>
-						<cfloop array="#arguments.stObject[property]#" index="item">
-							<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
-						</cfloop>
-					</cfif>
-				</cfcase>
+					</cfcase>
 
-				<cfcase value="double">
-					<cfset stResult[field] = arguments.stObject[property] />
-				</cfcase>
-				<cfcase value="double-array">
-					<cfif isSimpleValue(arguments.stObject[property])>
-						<cfset stResult[field] = listToArray(arguments.stObject[property]) />
-					<cfelse>
+					<cfcase value="lat-lon">
 						<cfset stResult[field] = arguments.stObject[property] />
-					</cfif>
-				</cfcase>
+					</cfcase>
 
-				<cfcase value="int">
-					<cfset stResult[field] = int(arguments.stObject[property]) />
-				</cfcase>
-				<cfcase value="int-array">
-					<cfif isSimpleValue(arguments.stObject[property])>
-						<cfset stResult[field] = listToArray(arguments.stObject[property]) />
-					<cfelse>
+					<cfcase value="literal">
 						<cfset stResult[field] = arguments.stObject[property] />
-					</cfif>
-					<cfloop from="1" to="#arraylen(stResult[field])#" index="i">
-						<cfset stResult[field][i] = int(stResult[field][i]) />
-					</cfloop>
-				</cfcase>
+					</cfcase>
+					<cfcase value="literal-array">
+						<cfif isSimpleValue(arguments.stObject[property])>
+							<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+						<cfelse>
+							<cfset stResult[field] = arguments.stObject[property] />
+						</cfif>
+					</cfcase>
 
-				<cfcase value="lat-lon">
-					<cfset stResult[field] = arguments.stObject[property] />
-				</cfcase>
-
-				<cfcase value="literal">
-					<cfset stResult[field] = arguments.stObject[property] />
-				</cfcase>
-				<cfcase value="literal-array">
-					<cfif isSimpleValue(arguments.stObject[property])>
-						<cfset stResult[field] = listToArray(arguments.stObject[property]) />
-					<cfelse>
+					<cfcase value="text">
 						<cfset stResult[field] = arguments.stObject[property] />
-					</cfif>
-				</cfcase>
+					</cfcase>
+					<cfcase value="text-array">
+						<cfif isSimpleValue(arguments.stObject[property])>
+							<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+						<cfelse>
+							<cfset stResult[field] = arguments.stObject[property] />
+						</cfif>
+					</cfcase>
+				</cfswitch>
 
-				<cfcase value="text">
-					<cfset stResult[field] = arguments.stObject[property] />
-				</cfcase>
-				<cfcase value="text-array">
-					<cfif isSimpleValue(arguments.stObject[property])>
-						<cfset stResult[field] = listToArray(arguments.stObject[property]) />
-					<cfelse>
-						<cfset stResult[field] = arguments.stObject[property] />
-					</cfif>
-				</cfcase>
-			</cfswitch>
+				<cfcatch>
+				    <cfset exception = createObject("java", "java.lang.Exception").init("error setting #stFields[field].type# #field# to value #serializeJSON(arguments.stObject[property])# from #arguments.stObject.typename#:#arguments.stObject.objectid# - #cfcatch.message#") />
+				    <cfset exception.initCause(cfcatch.getCause()) />
+				    <cfset exception.setStackTrace(cfcatch.getStackTrace()) />
+				    <cfthrow object="#exception#" />
+				</cfcatch>
+			</cftry>
 		</cfloop>
 
 		<cfreturn stResult />
