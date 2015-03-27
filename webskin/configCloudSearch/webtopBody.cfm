@@ -103,6 +103,7 @@
 
 		<cfif qDiffIndexFields.recordcount>
 			<h2>Updates Required</h2>
+			<a id="cloudsearch-apply-all" class="btn btn-primary" href="#application.fapi.getLink(type='configCloudSearch',view='webtopAjaxApplyAll')#">Apply All Updates</a>
 			<table class="table table-striped">
 				<thead>
 					<tr>
@@ -146,18 +147,10 @@
 			<div id="cloudsearch-update-results"></div>
 
 			<script type="text/javascript">
-				$j(document).on("click",".cloudsearch-domain-action", function(e){
-					var self = $j(this), confirmText = self.data("confirm"), url = this.href;
-
-					e.preventDefault();
-					e.stopPropagation();
+				function ajaxAction(url, confirmText, alertFn, htmlFn){
 
 					if (confirmText && confirmText.length && !window.confirm(confirmText)){
 						return;
-					}
-
-					function showAlert(status, message){
-						$j("##cloudsearch-domain-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
 					}
 
 					$j.ajax({
@@ -167,16 +160,16 @@
 						success : function(data){
 							if (data.errors.length){
 								for (var i=0; i<data.errors.length; i++){
-									showAlert("error", data.errors[i].message);
+									alertFn("error", data.errors[i].message);
 								}
 							}
 
 							if (data.message.length){
-								showAlert("info", data.message);
+								alertFn("info", data.message);
 							}
 
 							if (data.html.length){
-								showAlert("info",data.html);
+								htmlFn(data.html);
 							}
 						},
 						error : function(jqXHR, textStatus, errorThrown){
@@ -186,12 +179,12 @@
 								data = JSON.parse(jqXHR.responseText);
 								if (data.errors.length){
 									for (var i=0; i<data.errors.length; i++){
-										showAlert("error", data.errors[i].message);
+										alertFn("error", data.errors[i].message);
 									}
 									fallback = false;
 								}
 								else if (data.error){
-									showAlert("error", data.error.message);
+									alertFn("error", data.error.message);
 									fallback = false;
 								}
 							}
@@ -199,18 +192,34 @@
 
 							if (fallback){
 								if (jqXHR.status === 403) {
-									showAlert("error", "Access Forbidden - your session may have timed out");
+									alertFn("error", "Access Forbidden - your session may have timed out");
 								}
 								else {
-									showAlert("error", errorThrown);
+									alertFn("error", errorThrown);
 								}
 							}
 						}
 					});
+				}
+
+				$j(document).on("click",".cloudsearch-domain-action", function(e){
+					var self = $j(this);
+
+					e.preventDefault();
+					e.stopPropagation();
+
+					function showAlert(status, message){
+						$j("##cloudsearch-domain-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
+					}
+					function showHTML(html){
+						showAlert("info",html);
+					}
+
+					ajaxAction(this.href, self.data("confirm"), showAlert, showHTML);
 				});
 
 				$j(document).on("click",".cloudsearch-field-action", function(e){
-					var self = $j(this), tr = self.closest("tr"), url = this.href;
+					var self = $j(this), tr = self.closest("tr");
 
 					e.preventDefault();
 					e.stopPropagation();
@@ -220,54 +229,29 @@
 					function showAlert(status, message){
 						$j("##cloudsearch-update-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
 					}
+					function showHTML(html){
+						tr.replaceWith(html);
+					}
 
-					$j.ajax({
-						type : "GET",
-						dataType : "json",
-						url : url, 
-						success : function(data){
-							if (data.errors.length){
-								for (var i=0; i<data.errors.length; i++){
-									showAlert("error", data.errors[i].message);
-								}
-							}
+					ajaxAction(this.href, '', showAlert, showHTML);
+				});
 
-							if (data.message.length){
-								showAlert("info", data.message);
-							}
+				$j("##cloudsearch-apply-all").on("click", function(e){
+					var self = $j(this), tbody = self.closest("tbody");
 
-							if (data.html.length){
-								tr.replaceWith(data.html);
-							}
-						},
-						error : function(jqXHR, textStatus, errorThrown){
-							var fallback = true, data = {};
+					e.preventDefault();
+					e.stopPropagation();
 
-							try {
-								data = JSON.parse(jqXHR.responseText);
-								if (data.errors.length){
-									for (var i=0; i<data.errors.length; i++){
-										showAlert("error", data.errors[i].message);
-									}
-									fallback = false;
-								}
-								else if (data.error){
-									showAlert("error", data.error.message);
-									fallback = false;
-								}
-							}
-							catch(e){}
+					tbody.find(".cloudsearch-field-action").closest("td").html("...");
 
-							if (fallback){
-								if (jqXHR.status === 403) {
-									showAlert("error", "Access Forbidden - your session may have timed out");
-								}
-								else {
-									showAlert("error", errorThrown);
-								}
-							}
-						}
-					});
+					function showAlert(status, message){
+						$j("##cloudsearch-update-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
+					}
+					function showHTML(html){
+						tbody.html(html);
+					}
+
+					ajaxAction(this.href, '', showAlert, showHTML);
 				});
 			</script>
 		</cfif>

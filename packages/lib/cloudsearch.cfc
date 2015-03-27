@@ -1,6 +1,8 @@
 component {
 	
 	public any function init(){
+		this.fieldCache = {};
+		this.domainEndpoints = {};
 
 		return this;
 	}
@@ -121,7 +123,7 @@ component {
 		return len(domain) AND len(regionname) AND len(accessID) AND len(accessSecret);
 	}
 
-	public any function getClient(){
+	public any function getClient(string type="config", string domain=""){
 		var domain = application.fapi.getConfig("cloudsearch","domain","");
 		var regionname = application.fapi.getConfig("cloudsearch","region","");
 		var accessID = application.fapi.getConfig("cloudsearch","accessID","");
@@ -131,12 +133,13 @@ component {
 		var regions = "";
 		var region = "";
 		var tmpClient = "";
+		var endpoint = "";
 
 		if (not isEnabled()){
 			throw(message="The SQS settings for this application have not been set up");
 		}
 
-		if (not structkeyexists(this, "client")){
+		if (arguments.type eq "config" and not structkeyexists(this, "client")){
 			writeLog(file="cloudsearch",text="Starting SQS client");
 
 			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
@@ -149,8 +152,25 @@ component {
 
 			this.client = tmpClient;
 		}
+		if (arguments.type eq "domain" and not structkeyexists(this, "domainclient")){
+			writeLog(file="cloudsearch",text="Starting SQS client");
 
-		return this.client;
+			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
+			tmpClient = createobject("java","com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClient").init(credentials);
+
+			endpoint = getDomainEndpoint(arguments.domain);
+			writeLog(file="cloudsearch",text="Setting endpoint to [#endpoint#]");
+			tmpClient.setEndpoint(endpoint);
+
+			this.domainclient = tmpClient;
+		}
+
+		if (arguments.type eq "config"){
+			return this.client;
+		}
+		if (arguments.type eq "domain"){
+			return this.domainclient;
+		}
 	}
 
 	/* CloudSearch API Wrappers */
@@ -158,7 +178,7 @@ component {
 		var csClient = getClient();
 		var describeDomainsResult = csClient.describeDomains();
 		var domainResult = {};
-		var qResult = querynew("id,domain,created,processing,requires_index,deleted,instance_count,instance_type", "varchar,varchar,bit,bit,bit,bit,integer,varchar");
+		var qResult = querynew("id,domain,created,processing,requires_index,deleted,instance_count,instance_type,endpoint", "varchar,varchar,bit,bit,bit,bit,integer,varchar,varchar");
 
 		for (domainResult in describeDomainsResult.getDomainStatusList()){
 			queryAddRow(qResult);
@@ -170,6 +190,7 @@ component {
 			querySetCell(qResult,"deleted",domainResult.getDeleted());
 			querySetCell(qResult,"instance_count",domainResult.getSearchInstanceCount());
 			querySetCell(qResult,"instance_type",domainResult.getSearchInstanceType());
+			querySetCell(qResult,"endpoint",domainResult.getDocService().getEndpoint());
 		}
 
 		return qResult;
@@ -211,17 +232,20 @@ component {
 		return qResult;
 	}
 
-	public query function updateIndexField(string domain, required string field, required string type, required string default_value, required boolean return, required boolean search, required boolean facet, required boolean sort, required boolean highlight, required string analysis_scheme){
+	public query function updateIndexField(string domain, required string field, required string type, required string default_value, required boolean return, required boolean search, required boolean facet, required boolean sort, required boolean highlight, required string analysis_scheme, query qResult){
 		var csClient = getClient();
 		var defineIndexFieldRequest = createobject("java","com.amazonaws.services.cloudsearchv2.model.DefineIndexFieldRequest").init();
 		var indexField = createIndexFieldObject(argumentCollection=arguments);
 		var defineIndexFieldResponse = {};
 		var indexFieldStatus = {};
 		var indexStatus = {};
-		var qResult = querynew("field,type,default_value,return,search,facet,sort,highlight,analysis_scheme,pending_deletion,state","varchar,varchar,varchar,bit,bit,bit,bit,bit,varchar,bit,varchar");
 
 		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
-			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
+			arguments.domain = application.fapi.getConfig("cloudsearch","domain","");
+		}
+
+		if (not structKeyExists(arguments,"qResult")){
+			arguments.qResult = createIndexQuery();
 		}
 
 		defineIndexFieldRequest.setDomainName(arguments.domain);
@@ -231,30 +255,33 @@ component {
 
 		// create a single-row query for the update result
 		indexFieldStatus = defineIndexFieldResponse.getIndexField();
-		queryAddRow(qResult);
+		queryAddRow(arguments.qResult);
 
 		indexField = indexFieldStatus.getOptions();
-		querySetCell(qResult,"field",indexField.getIndexFieldName());
-		querySetCell(qResult,"type",indexField.getIndexFieldType());
-		insertIndexFieldOptions(qResult, 1, indexField);
+		querySetCell(arguments.qResult,"field",indexField.getIndexFieldName());
+		querySetCell(arguments.qResult,"type",indexField.getIndexFieldType());
+		insertIndexFieldOptions(arguments.qResult, 1, indexField);
 
 		indexStatus = indexFieldStatus.getStatus();
-		querySetCell(qResult,"pending_deletion",indexStatus.getPendingDeletion());
-		querySetCell(qResult,"state",indexStatus.getState());
+		querySetCell(arguments.qResult,"pending_deletion",indexStatus.getPendingDeletion());
+		querySetCell(arguments.qResult,"state",indexStatus.getState());
 
-		return qResult;
+		return arguments.qResult;
 	}
 
-	public query function deleteIndexField(string domain, required string field){
+	public query function deleteIndexField(string domain, required string field, query qResult){
 		var csClient = getClient();
 		var deleteIndexFieldRequest = createobject("java","com.amazonaws.services.cloudsearchv2.model.DeleteIndexFieldRequest").init();
 		var deleteIndexFieldResponse = {};
 		var indexFieldStatus = {};
 		var indexStatus = {};
-		var qResult = querynew("field,type,default_value,return,search,facet,sort,highlight,analysis_scheme,pending_deletion,state","varchar,varchar,varchar,bit,bit,bit,bit,bit,varchar,bit,varchar");
-
+		
 		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
 			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
+		}
+
+		if (not structKeyExists(arguments,"qResult")){
+			arguments.qResult = createIndexQuery();
 		}
 
 		deleteIndexFieldRequest.setDomainName(arguments.domain);
@@ -264,18 +291,18 @@ component {
 
 		// create a single-row query for the update result
 		indexFieldStatus = deleteIndexFieldResponse.getIndexField();
-		queryAddRow(qResult);
+		queryAddRow(arguments.qResult);
 
 		indexField = indexFieldStatus.getOptions();
-		querySetCell(qResult,"field",indexField.getIndexFieldName());
-		querySetCell(qResult,"type",indexField.getIndexFieldType());
-		insertIndexFieldOptions(qResult, 1, indexField);
+		querySetCell(arguments.qResult,"field",indexField.getIndexFieldName());
+		querySetCell(arguments.qResult,"type",indexField.getIndexFieldType());
+		insertIndexFieldOptions(arguments.qResult, 1, indexField);
 
 		indexStatus = indexFieldStatus.getStatus();
-		querySetCell(qResult,"pending_deletion",indexStatus.getPendingDeletion());
-		querySetCell(qResult,"state",indexStatus.getState());
+		querySetCell(arguments.qResult,"pending_deletion",indexStatus.getPendingDeletion());
+		querySetCell(arguments.qResult,"state",indexStatus.getState());
 
-		return qResult;
+		return arguments.qResult;
 	}
 
 	public array function indexDocuments(string domain){
@@ -300,7 +327,141 @@ component {
 		return aResult;
 	}
 
+	public struct function uploadDocuments(string domain, required string documents){
+		var csdClient = "";
+		var uploadDocumentsRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.UploadDocumentsRequest").init();
+		var uploadDocumentsResponse = {};
+		var contentType = createobject("java","com.amazonaws.services.cloudsearchdomain.model.ContentType").fromValue("application/json")
+		var inputStream = createobject("java","java.io.StringBufferInputStream").init(arguments.documents);
+		var aWarnings = [];
+		var warning = {};
+
+		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
+			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
+		}
+
+		csdClient = getClient("domain", arguments.domain);
+
+		uploadDocumentsRequest.setDocuments(inputStream);
+		uploadDocumentsRequest.setContentLength(len(documents));
+		uploadDocumentsRequest.setContentType(contentType);
+
+		uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
+
+		for (warning in uploadDocumentsResponse.getWarnings()){
+			arrayAppend(aWarnings,warning.getMessage());
+		}
+
+		return {
+			"adds" = uploadDocumentsResponse.getAdds(),
+			"deletes" = uploadDocumentsResponse.getDeletes(),
+			"status" = uploadDocumentsResponse.getStatus(),
+			"warnings" = aWarnings
+		};
+	}
+
+	public struct function search(string domain, string typename, string rawQuery, array conditions, numeric maxrows=10) {
+		var csdClient = "";
+		var searchRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.SearchRequest").init();
+		var searchResponse = {};
+		var hits = {};
+		var hit = {};
+		var facets = {};
+		var buckets = {};
+		var bucket = {};
+		var stIndexFields = {};
+		var aQuery = [];
+		var aSubQuery = [];
+		var key = "";
+		var keyS = "";
+		var prop = "";
+		var op = "";
+		var stResult = {};
+
+		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
+			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
+		}
+
+		csdClient = getClient("domain", arguments.domain);
+
+		if (not structKeyExists(arguments,"rawQuery")){
+			if (not structKeyExists(arguments,"conditions")){
+				arguments.conditions = [];
+			}
+
+			if (structKeyExists(arguments,"typename") and len(arguments.typename)){
+				stIndexFields = getTypeIndexFields(arguments.typename);
+
+				// filter by content type
+				if (listlen(arguments.typename)){
+					arrayPrepend(arguments.conditions, { "or"=[] });
+
+					for (key in listtoarray(arguments.typename)){
+						arrayAppend(arguments.conditions[1]["or"],{ "property"="typename", "term"=key });
+					}
+				}
+				else {
+					arrayPrepend(arguments.conditions, { "property"="typename", "term"=arguments.typename });
+				}
+			}
+			else {
+				stIndexFields = getTypeIndexFields();
+			}
+
+			arguments.rawQuery = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.conditions);
+
+			if (arraylen(arguments.conditions) gt 1){
+				arguments.rawQuery = "(and " & arguments.rawQuery & ")";
+			}
+			else if (arraylen(arguments.conditions) eq 1){
+				arguments.rawQuery = arguments.rawQuery;
+			}
+		}
+
+		searchRequest.setQueryParser("structured");
+		searchRequest.setQuery(arguments.rawQuery);
+		searchRequest.setSize(arguments.maxrows);
+
+		searchResponse = csdClient.search(searchRequest);
+		hits = searchResponse.getHits();
+		facets = searchResponse.getFacets();
+
+		stResult["time"] = searchResponse.getStatus().getTimems();
+		stResult["cursor"] = hits.getCursor();
+		stResult["items"] = querynew("objectid,typename,highlights");
+		stResult["facets"] = querynew("field,value,count","varchar,varchar,int");
+		if (structKeyExists(arguments,"conditions")){
+			stResult["conditions"] = arguments.conditions;
+		}
+		stResult["query"] = arguments.rawQuery;
+
+		for (hit in hits.getHit()){
+			queryAddRow(stResult.items);
+			querySetCell(stResult.items,"objectid",hit.getId());
+			querySetCell(stResult.items,"typename",hit.getFields()["typename_literal"][1]);
+			querySetCell(stResult.items,"highlights",serializeJSON(duplicate(hit.getHighlights())));
+		}
+
+		for (key in facets){
+			buckets = facets[key].getBuckets;
+
+			for (bucket in buckets){
+				queryAddRow(stResult.facets);
+				querySetCell(stResult.facets,"field",key);
+				querySetCell(stResult.facets,"value",bucket.getValue());
+				querySetCell(stResult.facets,"count",bucket.getCount());
+			}
+		}
+
+		return stResult;
+	}
+
+
 	/* CloudSearch Utility functions */
+	private query function createIndexQuery(){
+		return querynew("field,type,default_value,return,search,facet,sort,highlight,analysis_scheme,pending_deletion,state","varchar,varchar,varchar,bit,bit,bit,bit,bit,varchar,bit,varchar");
+	}
+
 	private any function insertIndexFieldOptions(required query q, required numeric row, required indexField){
 		var type = arguments.indexField.getIndexFieldType();
 		var indexFieldOptions = {};
@@ -343,13 +504,14 @@ component {
 
 		querySetCell(arguments.q, "default_value", indexFieldOptions.getDefaultValue(), arguments.row);
 		querySetCell(arguments.q, "return", indexFieldOptions.getReturnEnabled(), arguments.row);
-		querySetCell(arguments.q, "search", indexFieldOptions.getSearchEnabled(), arguments.row);
+		querySetCell(arguments.q, "search", 1, arguments.row);
 		querySetCell(arguments.q, "facet", 0, arguments.row);
 		querySetCell(arguments.q, "sort", 0, arguments.row);
 		querySetCell(arguments.q, "highlight", 0, arguments.row);
 		querySetCell(arguments.q, "analysis_scheme", "", arguments.row);
 
 		if (not listfindnocase("text,text-array",type)){
+			querySetCell(arguments.q, "search", indexFieldOptions.getSearchEnabled(), arguments.row);
 			querySetCell(arguments.q, "facet", indexFieldOptions.getFacetEnabled(), arguments.row);
 		}
 
@@ -419,9 +581,9 @@ component {
 		}
 
 		indexFieldOptions.setReturnEnabled(javacast("boolean",arguments.return));
-		indexFieldOptions.setSearchEnabled(javacast("boolean",arguments.search));
 
 		if (not listfindnocase("text,text-array",arguments.type)){
+			indexFieldOptions.setSearchEnabled(javacast("boolean",arguments.search));
 			indexFieldOptions.setFacetEnabled(javacast("boolean",arguments.facet));
 		}
 
@@ -433,7 +595,7 @@ component {
 			indexFieldOptions.setHighlightEnabled(javacast("boolean",arguments.highlight));
 
 			if (len(arguments.analysis_scheme)){
-				indexFieldOptions.setAnalysisScheme(javacast("boolean",arguments.analysis_scheme));
+				indexFieldOptions.setAnalysisScheme(arguments.analysis_scheme);
 			}
 		}
 
@@ -476,19 +638,249 @@ component {
 		return indexField;
 	}
 
+	public string function getRFC3339Date(required date d){
+		var asUTC = dateConvert("local2utc", arguments.d);
+
+		return dateformat(asUTC,"yyyy-mm-dd") & "T" & timeformat(asUTC,"HH:mm:ss") & "Z";
+	}
+
+	public string function getSearchQueryFromArray(required struct stIndexFields, required array conditions){
+		var item = {};
+		var arrOut = [];
+
+		for (item in arguments.conditions){
+			if (isSimpleValue(item)){
+				arrayAppend(arrOut,item);
+			}
+			else if (structKeyExists(item,"property")){
+				item["stIndexFields"] = arguments.stIndexFields;
+				arrayAppend(arrOut,getFieldQuery(argumentCollection=item));
+				structDelete(item,"stIndexFields");
+			}
+			else if (structKeyExists(item,"text")) {
+				arrayAppend(arrOut,getTextSearchQuery(arguments.stIndexFields, item.text));
+			}
+			else if (structKeyExists(item,"and")) {
+				if (arraylen(item["and"]) gt 1){
+					arrayAppend(arrOut,"(and " & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"]) & ")");
+				}
+				else {
+					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"]));
+				}
+			}
+			else if (structKeyExists(item,"or")) {
+				if (arraylen(item["or"]) gt 1){
+					arrayAppend(arrOut,"(or " & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"]) & ")");
+				}
+				else {
+					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"]));
+				}
+			}
+		}
+
+		return arrayToList(arrOut, " ");
+	}
+
+	private string function getTextValue(required string text){
+		return "'" & replacelist(trim(rereplace(arguments.text,"\s+"," ","ALL")),"', ","\',' '") & "'";
+	}
+
+	private string function getTextSearchQuery(required struct stIndexFields, required string text){
+		var aSubQuery = [];
+		var key = "";
+		var textStr = getTextValue(arguments.text);
+
+		for (key in arguments.stIndexFields){
+			if (listfindnocase("text,text-array",arguments.stIndexFields[key].type)) {
+				arrayAppend(aSubQuery,"(or field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# #textStr#)");
+			}
+		}
+
+		return "(or " & arraytolist(aSubQuery,' ') & ")";
+	}
+
+	private string function getFieldQuery(required struct stIndexFields, required string property){
+		var key = "";
+		var aSubQuery = [];
+		var str = "";
+		var value = "";
+
+		if (structKeyExists(arguments,"text")){
+			value = getTextValue(arguments.text);
+			for (key in arguments.stIndexFields){
+				if (arguments.stIndexFields[key].property eq arguments.property and listfindnocase("text,text-array",arguments.stIndexFields[key].type)) {
+					arrayAppend(aSubQuery,"(or field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# #value#)");
+				}
+			}
+		}
+		else if (structKeyExists(arguments,"term")){
+			for (key in arguments.stIndexFields){
+				if (arguments.stIndexFields[key].property eq arguments.property) {
+					switch (arguments.stIndexFields[key].type){
+						case "int": case "int-array": case "double": case "double-array":
+							value = arguments.term;
+							break;
+						case "text": case "text-array": case "literal": case "literal-array":
+							value = "'#replace(arguments.term,"'","\'")#'";
+							break;
+						case "date": case "date-array":
+							value = "'#getRFC3339Date(arguments.term)#'";
+							break;
+					}
+
+					arrayAppend(aSubQuery,"(term field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# #value#)");
+				}
+			}
+		}
+		else if (structKeyExists(arguments,"range")){
+			for (key in arguments.stIndexFields){
+				if (arguments.stIndexFields[key].property eq arguments.property) {
+					str = "";
+
+					// lower bound
+					if (structKeyExists(arguments.range,"gt")){
+						str = str & "{";
+						value = arguments.range["gt"];
+					}
+					else if (structKeyExists(arguments.range,"gte")){
+						str = str & "[";
+						value = arguments.range["gte"];
+					}
+					else {
+						str = str & "[";
+					}
+					if (structKeyExists(arguments.range,"gt") or structKeyExists(arguments.range,"gte")){
+						switch (arguments.stIndexFields[key].type){
+							case "int": case "int-array": case "double": case "double-array":
+								str = str & value;
+								break;
+							case "text": case "text-array": case "literal": case "literal-array":
+								str = str & "'#replace(value,"'","\'")#'";
+								break;
+							case "date": case "date-array":
+								str = str & "'#getRFC3339Date(value)#'";
+								break;
+						}
+					}
+
+					str = str & ",";
+
+					// upper bound
+					if (structKeyExists(arguments.range,"lt")){
+						value = arguments.range["lt"];
+					}
+					else if (structKeyExists(arguments.range,"lte")){
+						value = arguments.range["lte"];
+					}
+					if (structKeyExists(arguments.range,"lt") or structKeyExists(arguments.range,"lte")){
+						switch (arguments.stIndexFields[key].type){
+							case "int": case "int-array": case "double": case "double-array":
+								str = str & value;
+								break;
+							case "text": case "text-array": case "literal": case "literal-array":
+								str = str & "'#replace(value,"'","\'")#'";
+								break;
+							case "date": case "date-array":
+								str = str & "'#getRFC3339Date(value)#'";
+								break;
+						}
+					}
+					if (structKeyExists(arguments.range,"gt")){
+						str = str & "}";
+					}
+					else if (structKeyExists(arguments.range,"gte")){
+						str = str & "]";
+					}
+					else {
+						str = str & "]";
+					}
+
+					arrayAppend(aSubQuery,"(range field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# str)");
+				}
+			}
+		}
+
+		if (arrayLen(aSubQuery) gt 1){
+			return "(or " & arrayToList(aSubQuery," ") & ")";
+		}
+		else {
+			return aSubQuery[1];
+		}
+	}
+
 
 	/* CloudSearch Meta Functions */
+	public query function resolveIndexFieldDifferences(string domain, query qDifferences){
+		var qResult = createIndexQuery();
+		var stDiff = {};
 
-	public query function diffIndexFields(query qOldFields, query qNewFields, string fields=""){
+		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
+			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
+		}
+
+		if (not structKeyExists(arguments,"qDifferences")){
+			arguments.qDifferences = diffIndexFields(domain=arguments.domain);
+		}
+
+		for (stDiff in arguments.qDifferences){
+			switch (stDiff.action){
+				case "add":
+					updateIndexField(
+						domain = arguments.domain,
+						field = stDiff.field, 
+						type = stDiff.type, 
+						default_value = stDiff.default_value, 
+						return = stDiff.return, 
+						search = stDiff.search, 
+						facet = stDiff.facet, 
+						sort = stDiff.sort, 
+						highlight = stDiff.highlight, 
+						analysis_scheme = stDiff.analysis_scheme, 
+						qResult = qResult
+					);
+					break;
+				case "update":
+					updateIndexField(
+						domain = arguments.domain,
+						field = stDiff.field, 
+						type = stDiff.type, 
+						default_value = stDiff.default_value, 
+						return = stDiff.return, 
+						search = stDiff.search, 
+						facet = stDiff.facet, 
+						sort = stDiff.sort, 
+						highlight = stDiff.highlight, 
+						analysis_scheme = stDiff.analysis_scheme, 
+						qResult = qResult
+					);
+					break;
+				case "delete":
+					deleteIndexField(
+						domain = arguments.domain,
+						field = stDiff.field, 
+						qResult = qResult
+					);
+					break;
+			}
+		}
+
+		return qResult;
+	}
+
+	public query function diffIndexFields(string domain, query qOldFields, query qNewFields, string fields=""){
 		var stOld = {};
 		var stNew = {};
 		var stField = {};
 		var field = "";
 		var qResult = querynew("field,type,default_value,return,search,facet,sort,highlight,analysis_scheme,action","varchar,varchar,varchar,bit,bit,bit,bit,bit,varchar,varchar");
 
+		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
+			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
+		}
+
 		/* Default to AWS config for old, and FarCry config for new */
 		if (not structKeyExists(arguments,"qOldFields")){
-			arguments.qOldFields = getIndexFields();
+			arguments.qOldFields = getIndexFields(domain=arguments.domain);
 		}
 		if (not structKeyExists(arguments,"qNewFields")){
 			arguments.qNewFields = application.fapi.getContentType("csContentType").getIndexFields();
@@ -572,4 +964,58 @@ component {
 
 		return qResult;
 	}
+
+	public struct function getTypeIndexFields(string typename="all", boolean bUseCache=true){
+		if (not structKeyExists(this.fieldCache,arguments.typename) or not arguments.bUseCache){
+			updateTypeIndexFieldCache(arguments.typename);
+		}
+
+		return this.fieldCache[arguments.typename];
+	}
+
+	public void function updateTypeIndexFieldCache(string typename="all"){
+		var qIndexFields = "";
+		var stContentType = {};
+		var stField = {};
+
+		this.fieldCache[arguments.typename] = {};
+
+		if (arguments.typename eq "all"){
+			qIndexFields = application.fapi.getContentType(typename="csContentType").getIndexFields();
+		}
+		else {
+			qIndexFields = application.fapi.getContentType(typename="csContentType").getIndexFields(arguments.typename);
+		}
+
+		for (stField in qIndexFields){
+			this.fieldCache[arguments.typename][qIndexFields.field] = {
+				"field" = qIndexFields.field,
+				"property" = qIndexFields.property,
+				"type" = stField.type,
+				"weight" = stField.weight
+			}
+		}
+	}
+
+	public string function getDomainEndpoint(required string domain, boolean bUseCache=true){
+		var qDomains = "";
+		var stDomain = {};
+
+		if (not structKeyExists(this.domainEndpoints,arguments.bUseCache)){
+			qDomains = getDomains();
+			this.domainEndpoints = {};
+
+			for (stDomain in qDomains){
+				this.domainEndpoints[stDomain.domain] = stDomain.endpoint;
+			}
+		}
+
+		if (structKeyExists(this.domainEndpoints,arguments.domain)){
+			return this.domainEndpoints[arguments.domain];
+		}
+		else {
+			throw(message="Invalid domain [#arguments.domain#]");
+		}
+	}
+
 }

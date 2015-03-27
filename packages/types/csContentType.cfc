@@ -1,11 +1,5 @@
-<cfcomponent output="false" extends="farcry.core.packages.types.types" displayname="CloudSearch Content Type" hint="Manages content type index information" bFriendly="false" bObjectBroker="true" bSystem="true">
+<cfcomponent output="false" extends="farcry.core.packages.types.types" displayname="CloudSearch Content Type" hint="Manages content type index information" bFriendly="false" bObjectBroker="false" bSystem="true" bRefObjects="false">
 	
-	<cfproperty name="title" type="nstring" required="true" 
-		ftSeq="1" ftFieldset="CloudSearch Content Type" ftLabel="Title" 
-		ftType="string" 
-		bLabel="true" ftValidation="required"
-		ftHint="The name of this content type.  This will appear on the search form and will allow users to search a specific content type.">
-
 	<cfproperty name="contentType" type="nstring" required="true" 
 		ftSeq="2" ftFieldset="CloudSearch Content Type" ftLabel="Content Type" 
 		ftType="list" ftRenderType="dropdown" 
@@ -26,7 +20,10 @@
 
 	<cffunction name="AfterSave" access="public" output="false" returntype="struct" hint="Called from setData and createData and run after the object has been saved.">
 		<cfargument name="stProperties" required="yes" type="struct" hint="A structure containing the contents of the properties that were saved to the object.">
-		
+
+		<cfset application.fc.lib.cloudsearch.resolveIndexFieldDifferences() />
+		<cfset application.fc.lib.cloudsearch.updateTypeIndexFieldCache(typename=arguments.stProperties.typename) />
+
 		<cfreturn super.aftersave(argumentCollection = arguments) />
 	</cffunction>
 	
@@ -34,6 +31,8 @@
 		<cfargument name="typename" type="string" required="true" hint="The type of the object" />
 		<cfargument name="stObject" type="struct" required="true" hint="The object" />
 		
+		<cfset application.fc.lib.cloudsearch.resolveIndexFieldDifferences() />
+		<cfset application.fc.lib.cloudsearch.updateTypeIndexFieldCache(typename=arguments.stProperties.typename) />
 
 		<cfset super.onDelete(argumentCollection = arguments) />
 	</cffunction>
@@ -271,40 +270,218 @@
 	</cffunction>
 
 	<cffunction name="getIndexFields" access="public" output="false" returntype="query">
-		<cfargument name="fields" required="false" type="string" />
+		<cfargument name="typename" required="false" type="string" />
 
 		<cfset var qResult = "" />
 
 		<cfquery datasource="#application.dsn#" name="qResult">
-			select 	concat(lower(fieldName),'_',replace(fieldType,'-','_')) as field, fieldType as `type`, weight, bSort as `sort`, bFacet as `facet`,
-					'' as default_value, 0 as `return`, 1 as `search`, 0 as highlight, '' as analysis_scheme
-			from 	csContentType_aProperties
-			where 	bIndex=1
+			select 	p.fieldName as property, concat(lower(p.fieldName),'_',replace(p.fieldType,'-','_')) as field, p.fieldType as `type`, p.weight, p.bSort as `sort`, p.bFacet as `facet`,
+					'' as default_value, 0 as `return`, 1 as `search`, 0 as highlight, case when p.fieldType in ('text','text-array') then '_en_default_' else '' end as analysis_scheme
+			from 	csContentType ct
+					inner join
+					csContentType_aProperties p
+					on ct.objectid=p.parentid
+			where 	p.bIndex=1
+					<cfif structKeyExists(arguments,"typename")>
+						and ct.contentType = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.typename#">
+					</cfif>
 		</cfquery>
 
-		<cfset queryAddRow(qResult) />
-		<cfset querySetCell(qResult,"field","objectid_literal") />
-		<cfset querySetCell(qResult,"type","literal") />
-		<cfset querySetCell(qResult,"default_value","") />
-		<cfset querySetCell(qResult,"return",1) />
-		<cfset querySetCell(qResult,"search",1) />
-		<cfset querySetCell(qResult,"facet",0) />
-		<cfset querySetCell(qResult,"sort",0) />
-		<cfset querySetCell(qResult,"highlight",0) />
-		<cfset querySetCell(qResult,"analysis_scheme","") />
+		<cfif qResult.recordcount>
+			<cfset queryAddRow(qResult) />
+			<cfset querySetCell(qResult,"property","objectid") />
+			<cfset querySetCell(qResult,"field","objectid_literal") />
+			<cfset querySetCell(qResult,"type","literal") />
+			<cfset querySetCell(qResult,"weight",1) />
+			<cfset querySetCell(qResult,"default_value","") />
+			<cfset querySetCell(qResult,"return",1) />
+			<cfset querySetCell(qResult,"search",1) />
+			<cfset querySetCell(qResult,"facet",0) />
+			<cfset querySetCell(qResult,"sort",0) />
+			<cfset querySetCell(qResult,"highlight",0) />
+			<cfset querySetCell(qResult,"analysis_scheme","") />
 
-		<cfset queryAddRow(qResult) />
-		<cfset querySetCell(qResult,"field","typename_literal") />
-		<cfset querySetCell(qResult,"type","literal") />
-		<cfset querySetCell(qResult,"default_value","") />
-		<cfset querySetCell(qResult,"return",1) />
-		<cfset querySetCell(qResult,"search",1) />
-		<cfset querySetCell(qResult,"facet",1) />
-		<cfset querySetCell(qResult,"sort",0) />
-		<cfset querySetCell(qResult,"highlight",0) />
-		<cfset querySetCell(qResult,"analysis_scheme","") />
+			<cfset queryAddRow(qResult) />
+			<cfset querySetCell(qResult,"property","typename") />
+			<cfset querySetCell(qResult,"field","typename_literal") />
+			<cfset querySetCell(qResult,"type","literal") />
+			<cfset querySetCell(qResult,"weight",1) />
+			<cfset querySetCell(qResult,"default_value","") />
+			<cfset querySetCell(qResult,"return",1) />
+			<cfset querySetCell(qResult,"search",1) />
+			<cfset querySetCell(qResult,"facet",1) />
+			<cfset querySetCell(qResult,"sort",0) />
+			<cfset querySetCell(qResult,"highlight",0) />
+			<cfset querySetCell(qResult,"analysis_scheme","") />
+		</cfif>
 
 		<cfreturn qResult />
+	</cffunction>
+
+	<cffunction name="bulkImportIntoCloudSearch" access="public" output="false" returntype="struct">
+		<cfargument name="objectid" type="uuid" required="false" />
+		<cfargument name="stObject" type="struct" required="false" />
+		<cfargument name="maxRows" type="numeric" required="false" default="-1" />
+
+		<cfset var qContent = "" />
+		<cfset var oContent = "" />
+		<cfset var stContent = {} />
+		<cfset var strOut = createObject("java","java.lang.StringBuffer").init() />
+		<cfset var builtToDate = "" />
+		<cfset var stResult = {} />
+
+		<cfif not structKeyExists(arguments,"stObject")>
+			<cfset arguments.stObject = getData(objectid=arguments.objectid) />
+		</cfif>
+
+		<cfset oContent = application.fapi.getContentType(typename=arguments.stObject.contentType) />
+
+		<cfif application.fapi.showFarcryDate(arguments.stObject.builtToDate)>
+			<cfset qContent = application.fapi.getContentObjects(typename=arguments.stObject.contentType, lProperties="objectid,datetimeLastUpdated", datetimeLastUpdated_gt=arguments.stObject.builtToDate, orderBy="datetimeLastUpdated asc", maxrows=arguments.maxRows)/>
+		<cfelse>
+			<cfset qContent = application.fapi.getContentObjects(typename=arguments.stObject.contentType, lProperties="objectid,datetimeLastUpdated", orderBy="datetimeLastUpdated asc", maxrows=arguments.maxRows)/>
+		</cfif>
+
+		<cfset strOut.append("[") />
+
+		<cfloop query="qContent">
+			<cfset stContent = getCloudsearchDocument(stObject=oContent.getData(objectid=qContent.objectid)) />
+			
+			<cfset strOut.append('{"type":"add","id":"') />
+			<cfset strOut.append(qContent.objectid) />
+			<cfset strOut.append('","fields":') />
+			<cfset strOut.append(serializeJSON(stContent)) />
+			<cfset strOut.append('}') />
+
+			<cfif strOut.length() * (qContent.currentrow / (qContent.currentrow+1)) gt 5000000 or qContent.currentrow eq qContent.recordcount>
+				<cfset builtToDate = qContent.datetimeLastUpdated />
+				<cfset count = qContent.currentrow />
+			<cfelse>
+				<cfset strOut.append(",") />
+			</cfif>
+		</cfloop>
+
+		<cfset strOut.append("]") />
+
+		<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
+
+		<cfset stResult["typename"] = arguments.stObject.contentType />
+		<cfset stResult["count"] = count />
+		<cfset stResult["builtToDate"] = builtToDate />
+		<cfset arguments.stObject.builtToDate = builtToDate />
+		<cfset setData(stProperties=arguments.stObject) />
+
+		<cfreturn stResult />
+	</cffunction>
+
+	<cffunction name="getCloudsearchDocument" access="public" output="false" returntype="struct">
+		<cfargument name="objectid" type="uuid" required="false" />
+		<cfargument name="typename" type="string" required="false" />
+		<cfargument name="stObject" type="struct" required="false" />
+
+		<cfset var stFields = "" />
+		<cfset var field = "" />
+		<cfset var property = "" />
+		<cfset var stResult = {} />
+		<cfset var item = "" />
+		<cfset var oType = "" />
+		<cfset var i = 0 />
+
+		<cfif not structKeyExists(arguments,"stObject")>
+			<cfset arguments.stObject = application.fapi.getContentObject(typename=arguments.typename,objectid=arguments.objectid) />
+		</cfif>
+
+		<cfset oType = application.fapi.getContentType(arguments.stObject.typename) />
+
+		<cfset stFields = application.fc.lib.cloudsearch.getTypeIndexFields(arguments.stObject.typename) />
+
+		<cfloop collection="#stFields#" item="field">
+			<cfset property = stFields[field].property />
+
+			<!--- If there is a function in the type for this property, use that instead of the default --->
+			<cfif structKeyExists(oType,"getCloudsearch#property#")>
+				<cfinvoke component="#oType#" method="getCloudsearch#property#" returnvariable="item">
+					<cfinvokeargument name="stObject" value="#arguments.stObject#" />
+					<cfinvokeargument name="property" value="#property#" />
+					<cfinvokeargument name="stIndexField" value="#stFields[field]#" />
+				</cfinvoke>
+
+				<cfset stResult[field] = item />
+				<cfcontinue />
+			</cfif>
+
+			<cfswitch expression="#stFields[field].type#">
+				<cfcase value="date">
+					<cfset stResult[field] = application.fc.lib.cloudsearch.getRFC3339Date(arguments.stObject[property]) />
+				</cfcase>
+				<cfcase value="date-array">
+					<cfset stResult[field] = [] />
+
+					<cfif isSimpleValue(arguments.stObject[property])>
+						<cfloop list="#arguments.stObject[property]#" index="item">
+							<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
+						</cfloop>
+					<cfelse>
+						<cfloop array="#arguments.stObject[property]#" index="item">
+							<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
+						</cfloop>
+					</cfif>
+				</cfcase>
+
+				<cfcase value="double">
+					<cfset stResult[field] = arguments.stObject[property] />
+				</cfcase>
+				<cfcase value="double-array">
+					<cfif isSimpleValue(arguments.stObject[property])>
+						<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+					<cfelse>
+						<cfset stResult[field] = arguments.stObject[property] />
+					</cfif>
+				</cfcase>
+
+				<cfcase value="int">
+					<cfset stResult[field] = int(arguments.stObject[property]) />
+				</cfcase>
+				<cfcase value="int-array">
+					<cfif isSimpleValue(arguments.stObject[property])>
+						<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+					<cfelse>
+						<cfset stResult[field] = arguments.stObject[property] />
+					</cfif>
+					<cfloop from="1" to="#arraylen(stResult[field])#" index="i">
+						<cfset stResult[field][i] = int(stResult[field][i]) />
+					</cfloop>
+				</cfcase>
+
+				<cfcase value="lat-lon">
+					<cfset stResult[field] = arguments.stObject[property] />
+				</cfcase>
+
+				<cfcase value="literal">
+					<cfset stResult[field] = arguments.stObject[property] />
+				</cfcase>
+				<cfcase value="literal-array">
+					<cfif isSimpleValue(arguments.stObject[property])>
+						<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+					<cfelse>
+						<cfset stResult[field] = arguments.stObject[property] />
+					</cfif>
+				</cfcase>
+
+				<cfcase value="text">
+					<cfset stResult[field] = arguments.stObject[property] />
+				</cfcase>
+				<cfcase value="text-array">
+					<cfif isSimpleValue(arguments.stObject[property])>
+						<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+					<cfelse>
+						<cfset stResult[field] = arguments.stObject[property] />
+					</cfif>
+				</cfcase>
+			</cfswitch>
+		</cfloop>
+
+		<cfreturn stResult />
 	</cffunction>
 
 </cfcomponent>

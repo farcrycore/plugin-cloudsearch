@@ -3,7 +3,8 @@
 	<section mergeType="merge" id="tabSettings">
 		<subsection sequence="40" mergeType="merge" id="cloudsearchSubSection" label="Search">
 			<menu sequence="10" mergeType="merge" id="cloudsearchmenu" label="CloudSearch" labelType="value">
-				<menuitem sequence="10" mergeType="merge" id="configCloudSearch" label="CloudSearch Status" type="configCloudSearch" />
+				<menuitem sequence="10" mergeType="merge" id="configCloudSearch_status" label="CloudSearch Status" type="configCloudSearch" />
+				<menuitem sequence="10" mergeType="merge" id="configCloudSearch_search" label="Search" type="configCloudSearch" bodyView="webtopBodySearch" />
 				<menuitem sequence="20" mergeType="merge" id="csContentType" label="Type Indexes" type="csContentType" />
 			</menu>
 		</subsection>
