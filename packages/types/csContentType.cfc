@@ -550,13 +550,18 @@
 					</cfcase>
 
 					<cfcase value="literal">
-						<cfset stResult[field] = arguments.stObject[property] />
+						<cfif len(arguments.stObject[property])>
+							<cfset stResult[field] = arguments.stObject[property] />
+						</cfif>
 					</cfcase>
 					<cfcase value="literal-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
 							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
+						</cfif>
+						<cfif not arrayLen(stResult[field])>
+							<cfset structDelete(stResult,field) />
 						</cfif>
 					</cfcase>
 
