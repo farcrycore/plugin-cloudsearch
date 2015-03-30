@@ -23,6 +23,7 @@
 
 		<cfset application.fc.lib.cloudsearch.resolveIndexFieldDifferences() />
 		<cfset application.fc.lib.cloudsearch.updateTypeIndexFieldCache(typename=arguments.stProperties.typename) />
+		<cfset application.fc.lib.cloudsearch.updateTypeIndexFieldCache() />
 
 		<cfreturn super.aftersave(argumentCollection = arguments) />
 	</cffunction>
@@ -508,7 +509,7 @@
 						<cfset stResult[field] = [] />
 
 						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfloop list="#arguments.stObject[property]#" index="item">
+							<cfloop list="#arguments.stObject[property]#" index="item" delimiters=",#chr(10)##chr(13)#">
 								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
 							</cfloop>
 						<cfelse>
@@ -523,7 +524,7 @@
 					</cfcase>
 					<cfcase value="double-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
 						</cfif>
@@ -534,7 +535,7 @@
 					</cfcase>
 					<cfcase value="int-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
 						</cfif>
@@ -552,7 +553,7 @@
 					</cfcase>
 					<cfcase value="literal-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
 						</cfif>
@@ -563,7 +564,7 @@
 					</cfcase>
 					<cfcase value="text-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = listToArray(arguments.stObject[property]) />
+							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
 						</cfif>
