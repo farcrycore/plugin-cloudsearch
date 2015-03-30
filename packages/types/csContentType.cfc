@@ -361,6 +361,7 @@
 		<cfset var strOut = createObject("java","java.lang.StringBuffer").init() />
 		<cfset var builtToDate = "" />
 		<cfset var stResult = {} />
+		<cfset var count = 0 />
 
 		<cfif not structKeyExists(arguments,"stObject")>
 			<cfset arguments.stObject = getData(objectid=arguments.objectid) />

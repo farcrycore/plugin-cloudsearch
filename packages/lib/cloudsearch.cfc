@@ -140,7 +140,7 @@ component {
 		}
 
 		if (arguments.type eq "config" and not structkeyexists(this, "client")){
-			writeLog(file="cloudsearch",text="Starting SQS client");
+			writeLog(file="cloudsearch",text="Starting SQS config client");
 
 			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
 			tmpClient = createobject("java","com.amazonaws.services.cloudsearchv2.AmazonCloudSearchClient").init(credentials);
@@ -153,7 +153,7 @@ component {
 			this.client = tmpClient;
 		}
 		if (arguments.type eq "domain" and not structkeyexists(this, "domainclient")){
-			writeLog(file="cloudsearch",text="Starting SQS client");
+			writeLog(file="cloudsearch",text="Starting SQS domain client");
 
 			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
 			tmpClient = createobject("java","com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClient").init(credentials);
