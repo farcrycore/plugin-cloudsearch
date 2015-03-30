@@ -525,7 +525,13 @@
 					</cfcase>
 
 					<cfcase value="double">
-						<cfset stResult[field] = arguments.stObject[property] />
+						<cfif len(arguments.stObject[property])>
+							<cfset stResult[field] = int(arguments.stObject[property]) />
+						<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault"))>
+							<cfset stResult[field] = int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault")) />
+						<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "default"))>
+							<cfset stResult[field] = int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "default")) />
+						</cfif>
 					</cfcase>
 					<cfcase value="double-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
@@ -541,7 +547,13 @@
 					</cfcase>
 
 					<cfcase value="int">
-						<cfset stResult[field] = int(arguments.stObject[property]) />
+						<cfif len(arguments.stObject[property])>
+							<cfset stResult[field] = int(arguments.stObject[property]) />
+						<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault"))>
+							<cfset stResult[field] = int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault")) />
+						<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "default"))>
+							<cfset stResult[field] = int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "default")) />
+						</cfif>
 					</cfcase>
 					<cfcase value="int-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
