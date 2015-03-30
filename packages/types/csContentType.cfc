@@ -14,7 +14,6 @@
 	<cfproperty name="aProperties" type="array" 
 		ftSeq="11" ftFieldset="CloudSearch Content Type" ftLabel="Properties" 
 		ftWatch="contentType"
-		ftHint="How the properties for this content type should be indexed."
 		arrayProps="fieldName:string;fieldType:string;weight:integer;bIndex:boolean;bSort:boolean;bFacet:boolean"
 		ftHint="Notes: <ul><li>a literal is a field that is always used for exact matches - as well as UUIDs and arrays, it is also appropriate to use literal for list and status properties</li><li>array field types can be used for array and list properties, which are converted automatically</li><li>int field types do not handle empty values (i.e. null) - those properties must be a valid integer</ul>">
 
