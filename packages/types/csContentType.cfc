@@ -349,8 +349,8 @@
 	</cffunction>
 
 	<cffunction name="bulkImportIntoCloudSearch" access="public" output="false" returntype="struct">
-		<cfargument name="objectid" type="uuid" required="false" />
-		<cfargument name="stObject" type="struct" required="false" />
+		<cfargument name="objectid" type="uuid" required="false" hint="The objectid of the csContentType record to import" />
+		<cfargument name="stObject" type="struct" required="false" hint="The csContentType object to import" />
 		<cfargument name="maxRows" type="numeric" required="false" default="-1" />
 		<cfargument name="requestSize" type="numeric" required="false" default="5000000" />
 
@@ -401,11 +401,63 @@
 			<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
 			<cfset arguments.stObject.builtToDate = builtToDate />
 			<cfset setData(stProperties=arguments.stObject) />
-			<cflog file="cloudsearch" text="Updated #count# #arguments.stObject.contentType# records" />
+			<cflog file="cloudsearch" text="Updated #count# #arguments.stObject.contentType# record/s" />
 		</cfif>
 
 		<cfset stResult["typename"] = arguments.stObject.contentType />
 		<cfset stResult["count"] = count />
+		<cfset stResult["builtToDate"] = builtToDate />
+
+		<cfreturn stResult />
+	</cffunction>
+
+	<cffunction name="importIntoCloudSearch" access="public" output="false" returntype="struct">
+		<cfargument name="objectid" type="uuid" required="false" hint="The objectid of the content to import" />
+		<cfargument name="typename" type="string" required="false" hint="The typename of the content to import" />
+		<cfargument name="stObject" type="struct" required="false" hint="The content object to import" />
+		<cfargument name="operation" type="string" required="true" hint="updated or deleted" />
+
+		<cfset var oContent = "" />
+		<cfset var strOut = createObject("java","java.lang.StringBuffer").init() />
+		<cfset var builtToDate = "" />
+		<cfset var stResult = {} />
+
+		<cfif not structKeyExists(arguments,"stObject")>
+			<cfset arguments.stObject = application.fapi.getContentData(typename=arguments.typename,objectid=arguments.objectid) />
+		</cfif>
+
+		<cfset oContent = application.fapi.getContentType(typename=arguments.stObject.typename) />
+		
+		<cfset strOut.append("[") />
+
+		<cfif arguments.operation eq "updated">
+			<cfset stContent = getCloudsearchDocument(stObject=arguments.stObject) />
+			
+			<cfset strOut.append('{"type":"add","id":"') />
+			<cfset strOut.append(arguments.stObject.objectid) />
+			<cfset strOut.append('","fields":') />
+			<cfset strOut.append(serializeJSON(stContent)) />
+			<cfset strOut.append('}') />
+			<cfset builtToDate = arguments.stObject.datetimeLastUpdated />
+		<cfelseif arguments.operation eq "deleted">
+			<cfset strOut.append('{"type":"delete","id":"') />
+			<cfset strOut.append(arguments.stObject.objectid) />
+			<cfset strOut.append('"}') />
+			<cfset builtToDate = now() />
+		</cfif>
+
+		<cfset strOut.append("]") />
+
+		<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
+		<cfquery datasource="#application.dsn#">
+			update 	#application.dbowner#csContentType
+			set 	builtToDate=<cfqueryparam cfsqltype="cf_sql_timestamp" value="#builtToDate#" />
+			where 	contentType=<cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.stObject.typename#" />
+		</cfquery>
+		<cflog file="cloudsearch" text="Updated 1 #arguments.stObject.typename# record/s" />
+
+		<cfset stResult["typename"] = arguments.stObject.typename />
+		<cfset stResult["count"] = 1 />
 		<cfset stResult["builtToDate"] = builtToDate />
 
 		<cfreturn stResult />
