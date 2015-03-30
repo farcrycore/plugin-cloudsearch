@@ -512,6 +512,11 @@
 							<cfloop list="#arguments.stObject[property]#" index="item" delimiters=",#chr(10)##chr(13)#">
 								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
 							</cfloop>
+						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
+							<cfset stResult[field] = [] />
+							<cfloop array="#arguments.stObject[property]#" index="item">
+								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item.data)) />
+							</cfloop>
 						<cfelse>
 							<cfloop array="#arguments.stObject[property]#" index="item">
 								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
@@ -525,6 +530,11 @@
 					<cfcase value="double-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
 							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
+						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
+							<cfset stResult[field] = [] />
+							<cfloop array="#arguments.stObject[property]#" index="item">
+								<cfset arrayAppend(stResult[field], item.data) />
+							</cfloop>
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
 						</cfif>
@@ -536,6 +546,11 @@
 					<cfcase value="int-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
 							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
+						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
+							<cfset stResult[field] = [] />
+							<cfloop array="#arguments.stObject[property]#" index="item">
+								<cfset arrayAppend(stResult[field], item.data) />
+							</cfloop>
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
 						</cfif>
@@ -549,18 +564,18 @@
 					</cfcase>
 
 					<cfcase value="literal">
-						<cfif len(arguments.stObject[property])>
-							<cfset stResult[field] = arguments.stObject[property] />
-						</cfif>
+						<cfset stResult[field] = arguments.stObject[property] />
 					</cfcase>
 					<cfcase value="literal-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
 							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
+						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
+							<cfset stResult[field] = [] />
+							<cfloop array="#arguments.stObject[property]#" index="item">
+								<cfset arrayAppend(stResult[field], item.data) />
+							</cfloop>
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
-						</cfif>
-						<cfif not arrayLen(stResult[field])>
-							<cfset structDelete(stResult,field) />
 						</cfif>
 					</cfcase>
 
@@ -570,6 +585,11 @@
 					<cfcase value="text-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
 							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
+						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
+							<cfset stResult[field] = [] />
+							<cfloop array="#arguments.stObject[property]#" index="item">
+								<cfset arrayAppend(stResult[field], item.data) />
+							</cfloop>
 						<cfelse>
 							<cfset stResult[field] = arguments.stObject[property] />
 						</cfif>
