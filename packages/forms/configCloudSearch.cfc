@@ -21,4 +21,17 @@
 		ftSeq="12" ftWizardStep="" ftFieldset="Scheduled Task" ftLabel="Self Queuing"
 		ftHint="Disable if you want to set an interval and end date on the scheduled task. By default it will queue itself as long as there are more records to update in the index, then stop.">
 
+
+	<cfproperty name="redisHost" type="string" default="" ftDefault=""
+				ftSeq="21" ftFieldset="Redis" ftLabel="Host"
+				ftHint="The Redis server hostname" />
+
+	<cfproperty name="redisPort" type="string" default="6379" ftDefault="6379"
+				ftSeq="22" ftFieldset="Redis" ftLabel="Port"
+				ftHint="The Redis server port" />
+
+	<cfproperty name="redisLogSize" type="numeric" default="1000" ftDefault="1000"
+				ftSeq="23" ftFieldset="Redis" ftLabel="Log Size"
+				ftHint="The number of recent logs to keep" />
+
 </cfcomponent>

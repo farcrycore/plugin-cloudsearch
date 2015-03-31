@@ -12,7 +12,7 @@
 
 	<cftry>
 		<cfloop query="qTypes">
-			<cfset stResult = csContentType.bulkImportIntoCloudSearch(objectid=qTypes.objectid, maxRows=url.atatime, requestSize=100000) />
+			<cfset stResult = csContentType.bulkImportIntoCloudSearch(objectid=qTypes.objectid, maxRows=url.atatime) />
 
 			<cfif stResult.count>
 				<cfset count = stResult.count />

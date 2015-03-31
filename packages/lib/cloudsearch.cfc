@@ -370,7 +370,7 @@ component {
 		};
 	}
 
-	public struct function search(string domain, string typename, string rawQuery, array conditions, numeric maxrows=10) {
+	public struct function search(string domain, string typename, string rawQuery, array conditions, numeric maxrows=10, boolean log=true) {
 		var csdClient = "";
 		var searchRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.SearchRequest").init();
 		var searchResponse = {};
@@ -387,6 +387,11 @@ component {
 		var prop = "";
 		var op = "";
 		var stResult = {};
+
+		if (arguments.log){
+			arguments.log = false;
+			addSearchLog(args=duplicate(arguments));
+		}
 
 		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
 			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
@@ -442,6 +447,9 @@ component {
 		stResult["facets"] = querynew("field,value,count","varchar,varchar,int");
 		if (structKeyExists(arguments,"conditions")){
 			stResult["conditions"] = arguments.conditions;
+		}
+		if (structKeyExists(arguments,"rawQuery")){
+			stResult["rawQuery"] = arguments.rawQuery;
 		}
 		stResult["query"] = arguments.rawQuery;
 
@@ -1026,6 +1034,55 @@ component {
 		else {
 			throw(message="Invalid domain [#arguments.domain#]");
 		}
+	}
+
+
+	/* Logging */
+	public any function getRedis(){
+		if (not structKeyExists(this, "redis") and len(application.fapi.getConfig("sqs","redisHost",""))){
+			this.redis = createobject("component","farcry.plugins.sqs.packages.custom.cfredis");
+			this.redis.init(application.fapi.getConfig("cloudsearch","redisHost"), application.fapi.getConfig("cloudsearch","redisPort"));
+		}
+
+		if (structKeyExists(this, "redis")){
+			return this.redis;
+		}
+		else {
+			return false;
+		}
+	}
+
+	private void function addSearchLog(required struct args){
+		var redis = getRedis();
+		var logsize = 0;
+
+		if (not issimplevalue(redis)){
+			logsize = application.fapi.getConfig("cloudsearch","redisLogSize");
+			redis.rpush("#application.applicationname#:searchlog", '#application.fapi.dateToRFC822(now(), "+1000")#;' & serializeJSON(arguments.args));
+			redis._ltrim("#application.applicationname#:searchlog", -logsize, -1);
+		}
+	}
+
+	public array function getSearchLog(){
+		var redis = getRedis();
+		var logsize = 0;
+		var aLogs = [];
+		var aLogs2 = [];
+		var i = 0;
+
+		if (not issimplevalue(redis)){
+			logsize = application.fapi.getConfig("cloudsearch","redisLogSize");
+			aLogs = this.redis.lrange("#application.applicationname#:searchlog",0,logsize);
+		}
+
+		for (i=1; i<=arraylen(aLogs); i++){
+			arrayprepend(aLogs2, {
+				"timestamp" = application.fapi.RFC822ToDate(listfirst(aLogs[i],";")),
+				"args" = deserializeJSON(listrest(aLogs[i],";"))
+			});
+		}
+
+		return aLogs2;
 	}
 
 }
