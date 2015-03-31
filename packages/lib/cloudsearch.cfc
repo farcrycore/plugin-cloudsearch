@@ -1042,13 +1042,19 @@ component {
 
 	/* Logging */
 	public any function getRedis(){
-		if (not structKeyExists(this, "redis") and len(application.fapi.getConfig("sqs","redisHost",""))){
-			this.redis = createobject("component","farcry.plugins.sqs.packages.custom.cfredis");
-			this.redis.init(application.fapi.getConfig("cloudsearch","redisHost"), application.fapi.getConfig("cloudsearch","redisPort"));
+		var host = application.fapi.getConfig("cloudsearch","redisHost","");
+		var port = application.fapi.getConfig("cloudsearch","redisPort");
+		var client = "";
+
+		if (len(host) and (not structKeyExists(application.fc.lib, "redisClients") or not structkeyexists(application.fc.lib.redisClients,"#host#:#port#")){
+			param name="application.fc.lib.redisClients" default="#{}#";
+			client = createobject("component","farcry.plugins.cloudsearch.packages.custom.cfredis");
+			client.init(host, port);
+			application.fc.lib.redisClients["#host#:#port#"] = client;
 		}
 
-		if (structKeyExists(this, "redis")){
-			return this.redis;
+		if (structKeyExists(application.fc.lib.redisClients,"#host#:#port#")){
+			return application.fc.lib.redisClients["#host#:#port#"];
 		}
 		else {
 			return false;
