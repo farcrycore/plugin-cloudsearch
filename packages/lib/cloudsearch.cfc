@@ -694,6 +694,9 @@ component {
 					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"]));
 				}
 			}
+			else if (structKeyExists(item,"not")) {
+				arrayAppend(arrOut,"(not " & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["not"]));
+			}
 		}
 
 		return arrayToList(arrOut, " ");
