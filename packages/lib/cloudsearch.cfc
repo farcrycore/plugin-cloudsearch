@@ -136,11 +136,11 @@ component {
 		var endpoint = "";
 
 		if (not isEnabled()){
-			throw(message="The SQS settings for this application have not been set up");
+			throw(message="The CloudSearch settings for this application have not been set up");
 		}
 
 		if (arguments.type eq "config" and not structkeyexists(this, "client")){
-			writeLog(file="cloudsearch",text="Starting SQS config client");
+			writeLog(file="cloudsearch",text="Starting CloudSearch config client");
 
 			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
 			tmpClient = createobject("java","com.amazonaws.services.cloudsearchv2.AmazonCloudSearchClient").init(credentials);
@@ -153,7 +153,7 @@ component {
 			this.client = tmpClient;
 		}
 		if (arguments.type eq "domain" and not structkeyexists(this, "domainclient")){
-			writeLog(file="cloudsearch",text="Starting SQS domain client");
+			writeLog(file="cloudsearch",text="Starting CloudSearch domain client");
 
 			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
 			tmpClient = createobject("java","com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClient").init(credentials);
@@ -1044,13 +1044,13 @@ component {
 	public any function getRedis(){
 		var host = application.fapi.getConfig("cloudsearch","redisHost","");
 		var port = application.fapi.getConfig("cloudsearch","redisPort");
-		var client = "";
+		var newclient = "";
 
-		if (len(host) and (not structKeyExists(application.fc.lib, "redisClients") or not structkeyexists(application.fc.lib.redisClients,"#host#:#port#")){
+		if (len(host) and (not structKeyExists(application.fc.lib, "redisClients") or not structkeyexists(application.fc.lib.redisClients,"#host#:#port#"))){
 			param name="application.fc.lib.redisClients" default="#{}#";
-			client = createobject("component","farcry.plugins.cloudsearch.packages.custom.cfredis");
-			client.init(host, port);
-			application.fc.lib.redisClients["#host#:#port#"] = client;
+			newclient = createobject("component","farcry.plugins.cloudsearch.packages.custom.cfredis");
+			newclient.init(host, port);
+			application.fc.lib.redisClients["#host#:#port#"] = newclient;
 		}
 
 		if (structKeyExists(application.fc.lib.redisClients,"#host#:#port#")){
