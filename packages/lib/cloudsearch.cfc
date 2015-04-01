@@ -741,6 +741,71 @@ component {
 		return "'" & replacelist(trim(rereplace(arguments.text,"\s+"," ","ALL")),"', ","\',' '") & "'";
 	}
 
+	private string function getRangeValue(required struct stIndexField){
+		var str = "";
+		var value = "";
+
+		// lower bound
+		if (structKeyExists(arguments,"gt")){
+			str = str & "{";
+			value = arguments["gt"];
+		}
+		else if (structKeyExists(arguments,"gte")){
+			str = str & "[";
+			value = arguments["gte"];
+		}
+		else {
+			str = str & "{";
+		}
+		if (structKeyExists(arguments,"gt") or structKeyExists(arguments,"gte")){
+			switch (arguments.stIndexField.type){
+				case "int": case "int-array": case "double": case "double-array":
+					str = str & value;
+					break;
+				case "text": case "text-array": case "literal": case "literal-array":
+					str = str & "'#replace(value,"'","\'")#'";
+					break;
+				case "date": case "date-array":
+					str = str & "'#getRFC3339Date(value)#'";
+					break;
+			}
+		}
+
+		str = str & ",";
+
+		// upper bound
+		if (structKeyExists(arguments,"lt")){
+			value = arguments["lt"];
+		}
+		else if (structKeyExists(arguments,"lte")){
+			value = arguments["lte"];
+		}
+		if (structKeyExists(arguments,"lt") or structKeyExists(arguments,"lte")){
+			switch (arguments.stIndexField.type){
+				case "int": case "int-array": case "double": case "double-array":
+					str = str & value;
+					break;
+				case "text": case "text-array": case "literal": case "literal-array":
+					str = str & "'#replace(value,"'","\'")#'";
+					break;
+				case "date": case "date-array":
+					str = str & "'#getRFC3339Date(value)#'";
+					break;
+			}
+		}
+		if (structKeyExists(arguments,"lt")){
+			str = str & "}";
+		}
+		else if (structKeyExists(arguments,"lte")){
+			str = str & "]";
+		}
+		else {
+			str = str & "}";
+		}
+
+		return str;
+	}
+
 	private string function getTextSearchQuery(required struct stIndexFields, required string text, boolean bBoost=true, numeric indent=1){
 		var aSubQuery = [];
 		var key = "";
@@ -809,65 +874,7 @@ component {
 						boost = " boost=#arguments.stIndexFields[key].weight#";
 					}
 					
-					str = "";
-
-					// lower bound
-					if (structKeyExists(arguments.range,"gt")){
-						str = str & "{";
-						value = arguments.range["gt"];
-					}
-					else if (structKeyExists(arguments.range,"gte")){
-						str = str & "[";
-						value = arguments.range["gte"];
-					}
-					else {
-						str = str & "{";
-					}
-					if (structKeyExists(arguments.range,"gt") or structKeyExists(arguments.range,"gte")){
-						switch (arguments.stIndexFields[key].type){
-							case "int": case "int-array": case "double": case "double-array":
-								str = str & value;
-								break;
-							case "text": case "text-array": case "literal": case "literal-array":
-								str = str & "'#replace(value,"'","\'")#'";
-								break;
-							case "date": case "date-array":
-								str = str & "'#getRFC3339Date(value)#'";
-								break;
-						}
-					}
-
-					str = str & ",";
-
-					// upper bound
-					if (structKeyExists(arguments.range,"lt")){
-						value = arguments.range["lt"];
-					}
-					else if (structKeyExists(arguments.range,"lte")){
-						value = arguments.range["lte"];
-					}
-					if (structKeyExists(arguments.range,"lt") or structKeyExists(arguments.range,"lte")){
-						switch (arguments.stIndexFields[key].type){
-							case "int": case "int-array": case "double": case "double-array":
-								str = str & value;
-								break;
-							case "text": case "text-array": case "literal": case "literal-array":
-								str = str & "'#replace(value,"'","\'")#'";
-								break;
-							case "date": case "date-array":
-								str = str & "'#getRFC3339Date(value)#'";
-								break;
-						}
-					}
-					if (structKeyExists(arguments.range,"gt")){
-						str = str & "}";
-					}
-					else if (structKeyExists(arguments.range,"gte")){
-						str = str & "]";
-					}
-					else {
-						str = str & "}";
-					}
+					str = getRangeValue(stIndexField=arguments.stIndexFields[key],argumentCollection=arguments.range);
 
 					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(range field='#arguments.stIndexFields[key].field#'#boost# #str#)");
 				}
