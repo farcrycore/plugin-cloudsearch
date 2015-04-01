@@ -1,7 +1,7 @@
 <cfsetting enablecfoutputonly="true" />
 <!--- @@displayname: CloudSearch --->
 
-<cfimport taglib="/farcry/core/tags/formtool" prefix="ft" />
+<cfimport taglib="/farcry/core/tags/formtools" prefix="ft" />
 
 <cfset stResult = application.fc.lib.cloudsearch.search(typename=stObj.typename,conditions=[{ "property"="objectid", "term"=stObj.objectid }]) />
 <cfoutput><h2>Object ID Search</h2></cfoutput>
