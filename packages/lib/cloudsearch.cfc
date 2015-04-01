@@ -773,7 +773,7 @@ component {
 						value = arguments.range["gte"];
 					}
 					else {
-						str = str & "[";
+						str = str & "{";
 					}
 					if (structKeyExists(arguments.range,"gt") or structKeyExists(arguments.range,"gte")){
 						switch (arguments.stIndexFields[key].type){
@@ -818,10 +818,10 @@ component {
 						str = str & "]";
 					}
 					else {
-						str = str & "]";
+						str = str & "}";
 					}
 
-					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(range field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# str)");
+					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(range field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# #str#)");
 				}
 			}
 		}

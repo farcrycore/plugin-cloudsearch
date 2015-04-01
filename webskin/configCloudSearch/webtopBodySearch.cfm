@@ -7,6 +7,7 @@
 <cfparam name="form.searchtype" default="" />
 <cfparam name="form.text" default="" />
 <cfparam name="form.conditions" default="" />
+<cfparam name="form.raw" default="" />
 
 <skin:loadJS id="fc-jquery" />
 <skin:loadJS id="formatjson" />
@@ -94,6 +95,17 @@
 	<cfset queryTab = "conditions" />
 </ft:processform>
 
+<ft:processform action="Search Raw">
+	<cfset stSearch = application.fc.lib.cloudsearch.search(rawQuery=form.raw) />
+	<cfset form.searchtype = "" />
+	<cfset form.text = "" />
+	<cfset form.conditions = "" />
+	<cfset form.raw = stSearch.rawQuery />
+	<cfset form.history = 1 />
+
+	<cfset queryTab = "raw" />
+</ft:processform>
+
 <cfset qContentTypes = application.fapi.getContentObjects(typename="csContentType", lProperties="contentType", orderby="contentType") />
 <cfset aSearchLog = application.fc.lib.cloudsearch.getSearchLog() />
 
@@ -108,6 +120,7 @@
 				<li class="<cfif queryTab eq 'basic'>active</cfif>"><a href="##search-basic">Basic</a></li>
 				<li class="<cfif queryTab eq 'history'>active</cfif>"><a href="##search-history">History</a></li>
 				<li class="<cfif queryTab eq 'conditions'>active</cfif>"><a href="##search-conditions">Conditions</a></li>
+				<li class="<cfif queryTab eq 'raw'>active</cfif>"><a href="##search-raw">Raw Query</a></li>
 			</ul>
 
 			<div class="tab-content">
@@ -184,6 +197,14 @@
 
 					<ft:buttonPanel>
 						<ft:button value="Search Conditions" text="Search" />
+					</ft:buttonPanel>
+				</div>
+
+				<div id="search-raw" class="<cfif queryTab eq 'raw'>active</cfif> tab-pane">
+					<textarea id="raw-search" name="raw" class="span12" rows="5">#form.raw#</textarea>
+					
+					<ft:buttonPanel>
+						<ft:button value="Search Raw" text="Search" />
 					</ft:buttonPanel>
 				</div>
 			</div>
