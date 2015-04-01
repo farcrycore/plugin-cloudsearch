@@ -1,17 +1,19 @@
 <cfsetting enablecfoutputonly="true" />
 <!--- @@displayname: CloudSearch --->
 
+<cfimport taglib="/farcry/core/tags/formtool" prefix="ft" />
+
 <cfset stResult = application.fc.lib.cloudsearch.search(typename=stObj.typename,conditions=[{ "property"="objectid", "term"=stObj.objectid }]) />
-<cfoutput>
-	<h2>Object ID Search</h2>
-	<pre>#stResult.rawQuery#</pre>
-	<p>Records found: #stResult.items.recordcount#</p>
-</cfoutput>
+<cfoutput><h2>Object ID Search</h2></cfoutput>
+<ft:field label="Query"><cfoutput><pre>#stResult.rawQuery#</pre></cfoutput></ft:field>
+<ft:field label="Filter"><cfoutput><pre>#stResult.rawFilter#</pre></cfoutput></ft:field>
+<ft:field label="Records found"><cfoutput>#stResult.items.recordcount#</cfoutput></ft:field>
 
 <cfset stResult = application.fc.lib.cloudsearch.search(conditions=[{ "text"=stObj.label }]) />
-<cfoutput>
-	<h2>Label Search</h2>
-	<pre>#stResult.rawQuery#</pre>
+<cfoutput><h2>Label Search</h2></cfoutput>
+<ft:field label="Query"><cfoutput><pre>#stResult.rawQuery#</pre></cfoutput></ft:field>
+<ft:field label="Filter"><cfoutput><pre>#stResult.rawFilter#</pre></cfoutput></ft:field>
+<ft:field label="Results"><cfoutput>
 	<table class="table table-striped">
 		<thead>
 			<tr>
@@ -39,6 +41,6 @@
 			</cfif>
 		</tbody>
 	</table>
-</cfoutput>
+</cfoutput></ft:field>
 
 <cfsetting enablecfoutputonly="false" />

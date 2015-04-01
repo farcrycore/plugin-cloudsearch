@@ -370,7 +370,7 @@ component {
 		};
 	}
 
-	public struct function search(string domain, string typename, string rawQuery, array conditions, numeric maxrows=10, boolean log=true) {
+	public struct function search(string domain, string typename, string rawQuery, string rawFilter, array conditions, array filters, numeric maxrows=10, boolean log=true) {
 		var csdClient = "";
 		var searchRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.SearchRequest").init();
 		var searchResponse = {};
@@ -399,6 +399,7 @@ component {
 
 		csdClient = getClient("domain", arguments.domain);
 
+		// create query
 		if (not structKeyExists(arguments,"rawQuery")){
 			if (not structKeyExists(arguments,"conditions")){
 				arguments.conditions = [];
@@ -407,34 +408,62 @@ component {
 			if (structKeyExists(arguments,"typename") and len(arguments.typename)){
 				// filter by content type
 				if (listlen(arguments.typename)){
-					arrayPrepend(arguments.conditions, { "or"=[] });
-
 					for (key in listtoarray(arguments.typename)){
 						structAppend(stIndexFields, getTypeIndexFields(key));
-						arrayAppend(arguments.conditions[1]["or"],{ "property"="typename", "term"=key });
 					}
 				}
 				else {
 					stIndexFields = getTypeIndexFields(arguments.typename);
-					arrayPrepend(arguments.conditions, { "property"="typename", "term"=arguments.typename });
 				}
 			}
 			else {
 				stIndexFields = getTypeIndexFields();
 			}
 
-			arguments.rawQuery = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.conditions);
+			arguments.rawQuery = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.conditions, bBoost=true);
 
 			if (arraylen(arguments.conditions) gt 1){
 				arguments.rawQuery = "(and " & chr(10) & arguments.rawQuery & chr(10) & ")";
 			}
-			else if (arraylen(arguments.conditions) eq 1){
-				arguments.rawQuery = arguments.rawQuery;
+		}
+
+		// create filter
+		if (not structKeyExists(arguments,"rawFilter")){
+			if (not structKeyExists(arguments,"filters")){
+				arguments.filters = [];
+			}
+
+			if (structKeyExists(arguments,"typename") and len(arguments.typename)){
+				// filter by content type
+				if (listlen(arguments.typename)){
+					arrayPrepend(arguments.filters, { "or"=[] });
+
+					for (key in listtoarray(arguments.typename)){
+						arrayAppend(arguments.filters[1]["or"],{ "property"="typename", "term"=key });
+					}
+				}
+				else {
+					arrayPrepend(arguments.filters, { "property"="typename", "term"=arguments.typename });
+				}
+			}
+
+			if (arraylen(arguments.filters)){
+				arguments.rawFilter = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.filters, bBoost=false);
+
+				if (arraylen(arguments.filters) gt 1){
+					arguments.rawFilter = "(and " & chr(10) & arguments.rawFilter & chr(10) & ")";
+				}
+			}
+			else {
+				arguments.rawFilter = "";
 			}
 		}
 
 		searchRequest.setQueryParser("structured");
 		searchRequest.setQuery(arguments.rawQuery);
+		if (structKeyExists(arguments,"rawFilter") and len(arguments.rawFilter)){
+			searchRequest.setFilterQuery(arguments.rawFilter);
+		}
 		searchRequest.setSize(arguments.maxrows);
 
 		try {
@@ -453,10 +482,11 @@ component {
 		if (structKeyExists(arguments,"conditions")){
 			stResult["conditions"] = arguments.conditions;
 		}
-		if (structKeyExists(arguments,"rawQuery")){
-			stResult["rawQuery"] = arguments.rawQuery;
+		stResult["rawQuery"] = arguments.rawQuery;
+		if (structKeyExists(arguments,"filters")){
+			stResult["filters"] = arguments.filters;
 		}
-		stResult["query"] = arguments.rawQuery;
+		stResult["rawFilter"] = arguments.rawFilter;
 
 		for (hit in hits.getHit()){
 			queryAddRow(stResult.items);
@@ -667,7 +697,7 @@ component {
 		return dateformat(asUTC,"yyyy-mm-dd") & "T" & timeformat(asUTC,"HH:mm:ss") & "Z";
 	}
 
-	public string function getSearchQueryFromArray(required struct stIndexFields, required array conditions, numeric indent=1){
+	public string function getSearchQueryFromArray(required struct stIndexFields, required array conditions, boolean bBoost=true, numeric indent=1){
 		var item = {};
 		var arrOut = [];
 
@@ -677,30 +707,30 @@ component {
 			}
 			else if (structKeyExists(item,"property")){
 				item["stIndexFields"] = arguments.stIndexFields;
-				arrayAppend(arrOut,getFieldQuery(argumentCollection=item, indent=arguments.indent));
+				arrayAppend(arrOut,getFieldQuery(argumentCollection=item, bBoost=arguments.bBoost, indent=arguments.indent));
 				structDelete(item,"stIndexFields");
 			}
 			else if (structKeyExists(item,"text")) {
-				arrayAppend(arrOut,getTextSearchQuery(stIndexFields=arguments.stIndexFields, text=item.text, indent=arguments.indent));
+				arrayAppend(arrOut,getTextSearchQuery(stIndexFields=arguments.stIndexFields, text=item.text, bBoost=arguments.bBoost, indent=arguments.indent));
 			}
 			else if (structKeyExists(item,"and")) {
 				if (arraylen(item["and"]) gt 1){
-					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(and " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
+					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(and " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], bBoost=arguments.bBoost, indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
 				}
 				else {
-					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], indent=indent+1));
+					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], bBoost=arguments.bBoost, indent=indent+1));
 				}
 			}
 			else if (structKeyExists(item,"or")) {
 				if (arraylen(item["or"]) gt 1){
-					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(or " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"], indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
+					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(or " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"], bBoost=arguments.bBoost, indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
 				}
 				else {
-					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"], indent=indent+1));
+					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"], bBoost=arguments.bBoost, indent=indent+1));
 				}
 			}
 			else if (structKeyExists(item,"not")) {
-				arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(not " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["not"], indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
+				arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(not " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["not"], bBoost=arguments.bBoost, indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
 			}
 		}
 
@@ -711,37 +741,51 @@ component {
 		return "'" & replacelist(trim(rereplace(arguments.text,"\s+"," ","ALL")),"', ","\',' '") & "'";
 	}
 
-	private string function getTextSearchQuery(required struct stIndexFields, required string text, numeric indent=1){
+	private string function getTextSearchQuery(required struct stIndexFields, required string text, boolean bBoost=true, numeric indent=1){
 		var aSubQuery = [];
 		var key = "";
 		var textStr = getTextValue(arguments.text);
+		var boost = "";
 
 		for (key in arguments.stIndexFields){
 			if (listfindnocase("text,text-array",arguments.stIndexFields[key].type)) {
-				arrayAppend(aSubQuery,repeatstring(" ",arguments.indent+1) & "(or field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# #textStr#)");
+				if (arguments.bBoost){
+					boost = " boost=#arguments.stIndexFields[key].weight#";
+				}
+
+				arrayAppend(aSubQuery,repeatstring(" ",arguments.indent+1) & "(or field='#arguments.stIndexFields[key].field#'#boost# #textStr#)");
 			}
 		}
 
 		return repeatstring(" ",arguments.indent) & "(or " & chr(10) & arraytolist(aSubQuery,chr(10)) & repeatstring(" ",arguments.indent) & ")";
 	}
 
-	private string function getFieldQuery(required struct stIndexFields, required string property, string indent=1){
+	private string function getFieldQuery(required struct stIndexFields, required string property, boolean bBoost=true, string indent=1){
 		var key = "";
 		var aSubQuery = [];
 		var str = "";
 		var value = "";
+		var boost = "";
 
 		if (structKeyExists(arguments,"text")){
 			value = getTextValue(arguments.text);
 			for (key in arguments.stIndexFields){
 				if (arguments.stIndexFields[key].property eq arguments.property and listfindnocase("text,text-array",arguments.stIndexFields[key].type)) {
-					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(or field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# #value#)");
+					if (arguments.bBoost){
+						boost = " boost=#arguments.stIndexFields[key].weight#";
+					}
+					
+					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(or field='#arguments.stIndexFields[key].field#'#boost# #value#)");
 				}
 			}
 		}
 		else if (structKeyExists(arguments,"term")){
 			for (key in arguments.stIndexFields){
 				if (arguments.stIndexFields[key].property eq arguments.property) {
+					if (arguments.bBoost){
+						boost = " boost=#arguments.stIndexFields[key].weight#";
+					}
+
 					switch (arguments.stIndexFields[key].type){
 						case "int": case "int-array": case "double": case "double-array":
 							value = arguments.term;
@@ -754,13 +798,17 @@ component {
 							break;
 					}
 
-					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(term field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# #value#)");
+					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(term field='#arguments.stIndexFields[key].field#'#boost# #value#)");
 				}
 			}
 		}
 		else if (structKeyExists(arguments,"range")){
 			for (key in arguments.stIndexFields){
 				if (arguments.stIndexFields[key].property eq arguments.property) {
+					if (arguments.bBoost){
+						boost = " boost=#arguments.stIndexFields[key].weight#";
+					}
+					
 					str = "";
 
 					// lower bound
@@ -821,7 +869,7 @@ component {
 						str = str & "}";
 					}
 
-					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(range field='#arguments.stIndexFields[key].field#' boost=#arguments.stIndexFields[key].weight# #str#)");
+					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(range field='#arguments.stIndexFields[key].field#'#boost# #str#)");
 				}
 			}
 		}
@@ -829,8 +877,9 @@ component {
 		if (arrayLen(aSubQuery) gt 1){
 			return repeatstring(" ",arguments.indent) & "(or " & chr(10) & arrayToList(aSubQuery,chr(10)) & chr(10) & repeatstring(" ",arguments.indent) & ")";
 		}
-		else {
+		else {try{
 			return aSubQuery[1];
+		}catch(any e){ dump(arguments);abort; }
 		}
 	}
 
