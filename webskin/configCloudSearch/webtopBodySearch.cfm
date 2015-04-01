@@ -341,7 +341,7 @@
 
 <cfoutput>
 	<script>
-		$j(document).on("click",'.nav-tabs a', function (e) {
+		$j(document).on("click",'.farcry-main .nav-tabs a', function (e) {
 			e.preventDefault();
 			$j(this).tab('show');
 		});
