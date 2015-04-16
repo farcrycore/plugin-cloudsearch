@@ -26,7 +26,7 @@
 				<td>#yesNoFormat(stResult.qResult.highlight)#</td>
 				<td>#stResult.qResult.analysis_scheme#</td>
 				<td>wait for update</td>
-				<td><a class="cloudsearch-field-action" href="#application.fapi.getLink(type='configCloudSearch',view='webtopAjaxApply',urlParameters='field=#qDiffIndexFields.field#')#">refresh</a></td>
+				<td><a class="cloudsearch-field-action" href="#application.fapi.getLink(type='configCloudSearch',view='webtopAjaxApply',urlParameters='field=#stResult.qResult.field#')#">refresh</a></td>
 			</tr>
 		</cfloop>
 	</cfoutput></cfsavecontent>
