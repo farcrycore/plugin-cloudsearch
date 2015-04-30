@@ -8,7 +8,8 @@
 <cfparam name="form.text" default="" />
 <cfparam name="form.conditions" default="" />
 <cfparam name="form.filters" default="" />
-<cfparam name="form.rawQuery" default="" />
+<cfparam name="form.rawQuery" default="simple" />
+<cfparam name="form.queryParser" default="" />
 <cfparam name="form.rawFilter" default="" />
 
 <skin:loadJS id="fc-jquery" />
@@ -54,13 +55,14 @@
 		<cfset stArgs["typename"] = form.searchtype />
 	</cfif>
 	<cfif len(form.text)>
-		<cfset stArgs["conditions"] = [{ "text"=form.text }] />
+		<cfset stArgs.rawQuery = form.text />
 	</cfif>
 	<cfset stSearch = application.fc.lib.cloudsearch.search(argumentCollection=stArgs) />
 	<cfif structKeyExists(stSearch,"conditions")>
 		<cfset form.conditions = application.fapi.formatJSON(serializeJSON(stSearch.conditions)) />
 	</cfif>
 	<cfset form.rawQuery = stSearch.rawQuery />
+	<cfset form.queryParser = stSearch.queryParser />
 	<cfif structKeyExists(stSearch,"filters")>
 		<cfset form.filters = application.fapi.formatJSON(serializeJSON(stSearch.filters)) />
 	</cfif>
@@ -82,6 +84,7 @@
 		<cfset form.conditions = application.fapi.formatJSON(serializeJSON(stSearch.conditions)) />
 	</cfif>
 	<cfset form.rawQuery = stSearch.rawQuery />
+	<cfset form.queryParser = stSearch.queryParser />
 	<cfif structKeyExists(stSearch,"filters")>
 		<cfset form.filters = application.fapi.formatJSON(serializeJSON(stSearch.filters)) />
 	</cfif>
@@ -97,6 +100,7 @@
 		<cfset form.text = "" />
 		<cfset form.conditions = application.fapi.formatJSON(serializeJSON(stSearch.conditions)) />
 		<cfset form.rawQuery = stSearch.rawQuery />
+		<cfset form.queryParser = stSearch.queryParser />
 		<cfset form.filters = application.fapi.formatJSON(serializeJSON(stSearch.filters)) />
 		<cfset form.rawFilter = stSearch.rawFilter />
 		<cfset form.history = 1 />
@@ -108,11 +112,12 @@
 </ft:processform>
 
 <ft:processform action="Search Raw">
-	<cfset stSearch = application.fc.lib.cloudsearch.search(rawQuery=form.rawQuery,rawFilter=form.rawFilter) />
+	<cfset stSearch = application.fc.lib.cloudsearch.search(rawQuery=form.rawQuery, queryParser=form.queryParser, rawFilter=form.rawFilter) />
 	<cfset form.searchtype = "" />
 	<cfset form.text = "" />
 	<cfset form.conditions = "" />
 	<cfset form.rawQuery = stSearch.rawQuery />
+	<cfset form.queryParser = stSearch.queryParser />
 	<cfset form.filters = "" />
 	<cfset form.rawFilter = stSearch.rawFilter />
 	<cfset form.history = 1 />
@@ -183,6 +188,11 @@
 											<br>
 										</cfif>
 
+										<cfif structKeyExists(searchLog.args,"queryParser")>
+											<strong>Query Parser</strong>: <code>#searchLog.args.queryParser#</code>
+											<br>
+										</cfif>
+
 										<cfif structKeyExists(searchLog.args,"conditions")>
 											<strong>Conditions</strong>: <code class="formatjson">#serializeJSON(searchLog.args.conditions)#</code>
 											<br>
@@ -211,21 +221,25 @@
 				</div>
 
 				<div id="search-conditions" class="<cfif queryTab eq 'conditions'>active</cfif> tab-pane">
-					<textarea id="conditions-search" name="conditions" class="span12" rows="5">#form.conditions#</textarea>
-					<script>
-						window.conditionsCodeMirror = CodeMirror.fromTextArea(document.getElementById("conditions-search",{"mode":"json"}));
-						$j("a[href='##search-conditions']").on("shown",function(){
-							window.conditionsCodeMirror.refresh();
-						});
-					</script>
-
-					<textarea id="filters-search" name="filters" class="span12" rows="5">#form.filters#</textarea>
-					<script>
-						window.filtersCodeMirror = CodeMirror.fromTextArea(document.getElementById("filters-search",{"mode":"json"}));
-						$j("a[href='##search-filters']").on("shown",function(){
-							window.filtersCodeMirror.refresh();
-						});
-					</script>
+					<ft:field label="Query Parser">structured</ft:field>
+					<ft:field label="Conditions">
+						<textarea id="conditions-search" name="conditions" class="span12" rows="5">#form.conditions#</textarea>
+						<script>
+							window.conditionsCodeMirror = CodeMirror.fromTextArea(document.getElementById("conditions-search",{"mode":"json"}));
+							$j("a[href='##search-conditions']").on("shown",function(){
+								window.conditionsCodeMirror.refresh();
+							});
+						</script>
+					</ft:field>
+					<ft:field label="Filters">
+						<textarea id="filters-search" name="filters" class="span12" rows="5">#form.filters#</textarea>
+						<script>
+							window.filtersCodeMirror = CodeMirror.fromTextArea(document.getElementById("filters-search",{"mode":"json"}));
+							$j("a[href='##search-filters']").on("shown",function(){
+								window.filtersCodeMirror.refresh();
+							});
+						</script>
+					</ft:field>
 
 					<ft:buttonPanel>
 						<ft:button value="Search Conditions" text="Search" />
@@ -233,8 +247,20 @@
 				</div>
 
 				<div id="search-raw" class="<cfif queryTab eq 'raw'>active</cfif> tab-pane">
-					<textarea id="raw-search-conditions" name="rawQuery" class="span12" rows="5">#form.rawQuery#</textarea>
-					<textarea id="raw-search-filters" name="rawFilter" class="span12" rows="5">#form.rawFilter#</textarea>
+					<ft:field label="Query Parser">
+						<select id="raw-search-parser" name="queryParser" class="span12">
+							<option>simple</option>
+							<option>structured</option>
+							<option>lucene</option>
+							<option>dismax</option>
+						</select>
+					</ft:field>
+					<ft:field label="Query">
+						<textarea id="raw-search-conditions" name="rawQuery" class="span12" rows="5">#form.rawQuery#</textarea>
+					</ft:field>
+					<ft:field label="Filter">
+						<textarea id="raw-search-filters" name="rawFilter" class="span12" rows="5">#form.rawFilter#</textarea>
+					</ft:field>
 					
 					<ft:buttonPanel>
 						<ft:button value="Search Raw" text="Search" />
@@ -269,14 +295,24 @@
 			<div class="tab-content">
 				<cfif structKeyExists(stSearch,"conditions")>
 					<div id="results-conditions" class="tab-pane">
-						<pre class="formatjson">#stSearch.jsonConditions#</pre>
-						<pre class="formatjson">#stSearch.jsonFilters#</pre>
+						<ft:field label="Query Parser">#stSearch.queryParser#</ft:field>
+						<ft:field label="Conditions">
+							<pre class="formatjson">#stSearch.jsonConditions#</pre>
+						</ft:field>
+						<ft:field label="Filter">
+							<pre class="formatjson">#stSearch.jsonFilters#</pre>
+						</ft:field>
 					</div>
 				</cfif>
 
 				<div id="results-raw" class="tab-pane">
-					<pre>#stSearch.rawQuery#</pre>
-					<pre>#stSearch.rawFilter#</pre>
+					<ft:field label="Query Parser">#stSearch.queryParser#</ft:field>
+					<ft:field label="Raw Query">
+						<pre>#stSearch.rawQuery#</pre>
+					</ft:field>
+					<ft:field label="Raw Filter">
+						<pre>#stSearch.rawFilter#</pre>
+					</ft:field>
 				</div>
 
 				<div id="results-items" class="tab-pane active">

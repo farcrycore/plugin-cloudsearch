@@ -370,7 +370,7 @@ component {
 		};
 	}
 
-	public struct function search(string domain, string typename, string rawQuery, string rawFilter, array conditions, array filters, numeric maxrows=10, boolean log=true) {
+	public struct function search(string domain, string typename, string rawQuery, string queryParser="simple", string rawFilter, array conditions, array filters, numeric maxrows=10, boolean log=true) {
 		var csdClient = "";
 		var searchRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.SearchRequest").init();
 		var searchResponse = {};
@@ -387,6 +387,7 @@ component {
 		var prop = "";
 		var op = "";
 		var stResult = {};
+		var st = {};
 
 		if (arguments.log){
 			arguments.log = false;
@@ -420,7 +421,9 @@ component {
 				stIndexFields = getTypeIndexFields();
 			}
 
-			arguments.rawQuery = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.conditions, bBoost=true);
+			st = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.conditions, bBoost=true);
+			arguments.rawQuery = st.query;
+			arguments.queryParser = st.parser;
 
 			if (arraylen(arguments.conditions) gt 1){
 				arguments.rawQuery = "(and " & chr(10) & arguments.rawQuery & chr(10) & ")";
@@ -459,7 +462,7 @@ component {
 			}
 		}
 
-		searchRequest.setQueryParser("structured");
+		searchRequest.setQueryParser(arguments.queryParser);
 		searchRequest.setQuery(arguments.rawQuery);
 		if (structKeyExists(arguments,"rawFilter") and len(arguments.rawFilter)){
 			searchRequest.setFilterQuery(arguments.rawFilter);
@@ -483,6 +486,7 @@ component {
 			stResult["conditions"] = arguments.conditions;
 		}
 		stResult["rawQuery"] = arguments.rawQuery;
+		stResult["queryParser"] = arguments.queryParser;
 		if (structKeyExists(arguments,"filters")){
 			stResult["filters"] = arguments.filters;
 		}
@@ -734,7 +738,10 @@ component {
 			}
 		}
 
-		return arrayToList(arrOut, chr(10));
+		return {
+			"query" = arrayToList(arrOut, chr(10)),
+			"parser" = "structured"
+		};
 	}
 
 	private string function getTextValue(required string text){
