@@ -400,25 +400,26 @@ component {
 
 		csdClient = getClient("domain", arguments.domain);
 
+		// collect index field information
+		if (structKeyExists(arguments,"typename") and len(arguments.typename)){
+			// filter by content type
+			if (listlen(arguments.typename)){
+				for (key in listtoarray(arguments.typename)){
+					structAppend(stIndexFields, getTypeIndexFields(key));
+				}
+			}
+			else {
+				stIndexFields = getTypeIndexFields(arguments.typename);
+			}
+		}
+		else {
+			stIndexFields = getTypeIndexFields();
+		}
+
 		// create query
 		if (not structKeyExists(arguments,"rawQuery")){
 			if (not structKeyExists(arguments,"conditions")){
 				arguments.conditions = [];
-			}
-
-			if (structKeyExists(arguments,"typename") and len(arguments.typename)){
-				// filter by content type
-				if (listlen(arguments.typename)){
-					for (key in listtoarray(arguments.typename)){
-						structAppend(stIndexFields, getTypeIndexFields(key));
-					}
-				}
-				else {
-					stIndexFields = getTypeIndexFields(arguments.typename);
-				}
-			}
-			else {
-				stIndexFields = getTypeIndexFields();
 			}
 
 			st = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.conditions, bBoost=true);
@@ -451,7 +452,7 @@ component {
 			}
 
 			if (arraylen(arguments.filters)){
-				arguments.rawFilter = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.filters, bBoost=false);
+				arguments.rawFilter = getSearchQueryFromArray(stIndexFields=stIndexFields, conditions=arguments.filters, bBoost=false).query;
 
 				if (arraylen(arguments.filters) gt 1){
 					arguments.rawFilter = "(and " & chr(10) & arguments.rawFilter & chr(10) & ")";
@@ -701,7 +702,7 @@ component {
 		return dateformat(asUTC,"yyyy-mm-dd") & "T" & timeformat(asUTC,"HH:mm:ss") & "Z";
 	}
 
-	public string function getSearchQueryFromArray(required struct stIndexFields, required array conditions, boolean bBoost=true, numeric indent=1){
+	public struct function getSearchQueryFromArray(required struct stIndexFields, required array conditions, boolean bBoost=true, numeric indent=1){
 		var item = {};
 		var arrOut = [];
 
@@ -719,22 +720,22 @@ component {
 			}
 			else if (structKeyExists(item,"and")) {
 				if (arraylen(item["and"]) gt 1){
-					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(and " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], bBoost=arguments.bBoost, indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
+					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(and " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], bBoost=arguments.bBoost, indent=indent+1).query & chr(10) & repeatstring(" ",arguments.indent) & ")");
 				}
 				else {
-					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], bBoost=arguments.bBoost, indent=indent+1));
+					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], bBoost=arguments.bBoost, indent=indent+1).query);
 				}
 			}
 			else if (structKeyExists(item,"or")) {
 				if (arraylen(item["or"]) gt 1){
-					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(or " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"], bBoost=arguments.bBoost, indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
+					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(or " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"], bBoost=arguments.bBoost, indent=indent+1).query & chr(10) & repeatstring(" ",arguments.indent) & ")");
 				}
 				else {
-					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"], bBoost=arguments.bBoost, indent=indent+1));
+					arrayAppend(arrOut,getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["or"], bBoost=arguments.bBoost, indent=indent+1).query);
 				}
 			}
 			else if (structKeyExists(item,"not")) {
-				arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(not " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["not"], bBoost=arguments.bBoost, indent=indent+1) & chr(10) & repeatstring(" ",arguments.indent) & ")");
+				arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(not " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["not"], bBoost=arguments.bBoost, indent=indent+1).query & chr(10) & repeatstring(" ",arguments.indent) & ")");
 			}
 		}
 
