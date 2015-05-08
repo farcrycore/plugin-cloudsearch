@@ -892,9 +892,11 @@ component {
 		if (arrayLen(aSubQuery) gt 1){
 			return repeatstring(" ",arguments.indent) & "(or " & chr(10) & arrayToList(aSubQuery,chr(10)) & chr(10) & repeatstring(" ",arguments.indent) & ")";
 		}
-		else {try{
+		else if (arraylen(aSubQuery)) {
 			return aSubQuery[1];
-		}catch(any e){ dump(arguments);abort; }
+		}
+		else {
+			throw(message="No query generated from arguments", detail=serializeJSON(arguments));
 		}
 	}
 
