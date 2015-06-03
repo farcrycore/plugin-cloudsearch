@@ -2,6 +2,42 @@
 <!--- @@displayname: CloudSearch --->
 
 <cfimport taglib="/farcry/core/tags/formtools" prefix="ft" />
+<cfimport taglib="/farcry/core/tags/webskin" prefix="skin" />
+
+<skin:loadJS id="fc-jquery" />
+<skin:loadJS id="formatjson" />
+<skin:htmlHead><cfoutput>
+	<style>
+		##message-log td, ##message-log th {
+			padding: 5px;
+		}
+		##message-log .this-item td {
+			background-color: ##dff0d8;
+		}
+		##message-log .related-item td {
+			background-color: ##fcf8e3;
+		}
+		.formatjson .key {
+			color:##a020f0;
+		}
+		.formatjson .number {
+			color:##ff0000;
+		}
+		.formatjson .string {
+			color:##000000;
+		}
+		.formatjson .boolean {
+			color:##ffa500;
+		}
+		.formatjson .null {
+			color:##0000ff;
+		}
+	</style>
+</cfoutput></skin:htmlHead>
+
+<cfset stDoc = application.fapi.getContentType("csContentType").getCloudsearchDocument(stObject=stObj) />
+<cfset jsonOut = application.fapi.formatJSON(serializeJSON(stDoc)) />
+<ft:field label="Document"><cfoutput><pre class="formatjson">#jsonOut#</pre></cfoutput></ft:field>
 
 <cfset stResult = application.fc.lib.cloudsearch.search(typename=stObj.typename,conditions=[{ "property"="objectid", "term"=stObj.objectid }]) />
 <cfoutput><h2>Object ID Search</h2></cfoutput>
@@ -9,7 +45,7 @@
 <ft:field label="Filter"><cfoutput><pre>#stResult.rawFilter#</pre></cfoutput></ft:field>
 <ft:field label="Records found"><cfoutput>#stResult.items.recordcount#</cfoutput></ft:field>
 
-<cfset stResult = application.fc.lib.cloudsearch.search(conditions=[{ "text"=stObj.label }]) />
+<cfset stResult = application.fc.lib.cloudsearch.search(rawQuery=stObj.label) />
 <cfoutput><h2>Label Search</h2></cfoutput>
 <ft:field label="Query"><cfoutput><pre>#stResult.rawQuery#</pre></cfoutput></ft:field>
 <ft:field label="Filter"><cfoutput><pre>#stResult.rawFilter#</pre></cfoutput></ft:field>

@@ -595,7 +595,11 @@
 					</cfcase>
 
 					<cfcase value="text">
-						<cfset stResult[field] = replace(arguments.stObject[property],chr(11)," ","ALL") />
+						<cfif structkeyexists(application.stCOAPI[arguments.stObject.typename].stProps[property].metadata, "ftRichtextConfig")>
+							<cfset stResult[field] = rereplace(replace(arguments.stObject[property],chr(11)," ","ALL"), "<[^>]+>", " ", "ALL") />
+						<cfelse>
+							<cfset stResult[field] = replace(arguments.stObject[property],chr(11)," ","ALL") />
+						</cfif>
 					</cfcase>
 					<cfcase value="text-array">
 						<cfif isSimpleValue(arguments.stObject[property])>
