@@ -29,7 +29,7 @@
 
 		<!--- update index --->
 		<cfif not structIsEmpty(st)>
-			<cfset structappend(stProps, application.fapi.getContentType(typename=stProps.typename, objectid=stProps.objectid)) />
+			<cfset structappend(stProps, application.fapi.getContentType(typename=stProps.typename, objectid=stProps.objectid), false) />
 			<cfset application.fapi.getContentType("csContentType").importIntoCloudSearch(stObject=stProps, operation="updated") />
 		</cfif>
 	</cffunction>
