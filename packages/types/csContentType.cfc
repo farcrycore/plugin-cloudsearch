@@ -619,7 +619,11 @@
 				</cfswitch>
 
 				<cfcatch>
-				    <cfset exception = createObject("java", "java.lang.Exception").init("error setting #stFields[field].type# #field# to value #serializeJSON(arguments.stObject[property])# from #arguments.stObject.typename#:#arguments.stObject.objectid# - #cfcatch.message#") />
+					<cfset item = "" />
+					<cfif structKeyExists(arguments.stObject, property)>
+						<cfset item = arguments.stObject[property] />
+					</cfif>
+				    <cfset exception = createObject("java", "java.lang.Exception").init("error setting #stFields[field].type# #field# to value #serializeJSON(item)# from #arguments.stObject.typename#:#arguments.stObject.objectid# - #cfcatch.message#") />
 				    <cfset exception.initCause(cfcatch.getCause()) />
 				    <cfset exception.setStackTrace(cfcatch.getStackTrace()) />
 				    <cfthrow object="#exception#" />
