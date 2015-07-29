@@ -370,7 +370,7 @@ component {
 		};
 	}
 
-	public struct function search(string domain, string typename, string rawQuery, string queryParser="simple", string rawFilter, array conditions, array filters, numeric maxrows=10, boolean log=true) {
+	public struct function search(string domain, string typename, string rawQuery, string queryParser="simple", string rawFilter, array conditions, array filters, numeric maxrows=10, numeric page=1, boolean log=true) {
 		var csdClient = "";
 		var searchRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.SearchRequest").init();
 		var searchResponse = {};
@@ -468,6 +468,7 @@ component {
 		if (structKeyExists(arguments,"rawFilter") and len(arguments.rawFilter)){
 			searchRequest.setFilterQuery(arguments.rawFilter);
 		}
+		searchRequest.setStart(arguments.maxrows * (arguments.page - 1));
 		searchRequest.setSize(arguments.maxrows);
 
 		try {
@@ -492,6 +493,9 @@ component {
 			stResult["filters"] = arguments.filters;
 		}
 		stResult["rawFilter"] = arguments.rawFilter;
+		stResult["recordcount"] = hits.getFound();
+		stResult["page"] = arguments.page;
+		stResult["maxrows"] = arguments.maxrows;
 
 		for (hit in hits.getHit()){
 			queryAddRow(stResult.items);
