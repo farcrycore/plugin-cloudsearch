@@ -1938,6 +1938,29 @@ Thanks!
         </cfif>
     </cffunction>
 
+    <!--- SETNXEX - Long setnxex(String key, String value, Numeric seconds) --->
+    <cffunction name="setnxex" access="public" returntype="numeric" output="no">
+        <cfargument name="key" type="string" required="yes" />
+        <cfargument name="value" type="string" required="yes" />
+        <cfargument name="seconds" type="numeric" required="yes" />
+
+        <cfset var connection = '' />
+        <cfset var result = '' />
+
+        <cfset connection = getResource() />
+        <cfset result = connection.setnx(JavaCast("string", arguments.key), JavaCast("string", arguments.value)) />
+        <cfif result eq 1>
+            <cfset connection.expire(JavaCast("string", arguments.key), JavaCast("int", arguments.seconds)) />
+        </cfif>
+        <cfset returnResource(connection) />
+
+        <cfif isDefined("result")>
+            <cfreturn result />
+        <cfelse>
+            <cfreturn 0 />
+        </cfif>
+    </cffunction>
+
 
     <!--- SETRANGE - long setrange(String key, long offset, String value) --->
     <cffunction name="setrange" access="public" returntype="numeric" output="no">
