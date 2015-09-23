@@ -121,6 +121,7 @@
 						<th>Type <a target="_blank" href="http://docs.aws.amazon.com/cloudsearch/latest/developerguide/configuring-index-fields.html"><i class="fa fa-question-o"></i></a></th>
 						<th>Weight</th>
 						<th>Sortable</th>
+						<th>Facetable</th>
 						<th></th>
 					</tr>
 				</thead>
@@ -136,7 +137,6 @@
 							<td>
 								<input type="checkbox" name="#arguments.fieldname#bIndex#i#" value="1" <cfif thisobject.bIndex>checked</cfif> onchange="$j(this).closest('tr').toggleClass('success');" />
 								<input type="hidden" name="#arguments.fieldname#bIndex#i#" value="0" />
-								<input type="hidden" name="#arguments.fieldname#bFacet#i#" value="#thisobject.bFacet#" />
 							</td>
 							<td>
 								<input type="hidden" name="#arguments.fieldname#field#i#" value="#thisobject.fieldName#" />
@@ -161,6 +161,10 @@
 							<td>
 								<input type="checkbox" name="#arguments.fieldname#bSort#i#" value="1" <cfif thisobject.bSort>checked</cfif> />
 								<input type="hidden" name="#arguments.fieldname#bSort#i#" value="0" />
+							</td>
+							<td>
+								<input type="checkbox" name="#arguments.fieldname#bFacet#i#" value="1" <cfif thisobject.bFacet>checked</cfif> />
+								<input type="hidden" name="#arguments.fieldname#bFacet#i#" value="0" />
 							</td>
 							<td>
 								<a href="##" onclick="$j(this).closest('tr').remove(); return false;"><i class="fa fa-times"></i></a>
@@ -207,19 +211,34 @@
 
 		<cfset var qMetadata = application.stCOAPI[arguments.typename].qMetadata />
 		<cfset var stField = {} />
+		<cfset var oType = application.fapi.getContentType(arguments.typename) />
+		<cfset var qResult = "" />
 
+		<!--- Actual properties --->
 		<cfquery dbtype="query" name="qMetadata">
 			select 		propertyname as field, '' as label, ftType as type, ftSeq 
 			from 		qMetadata
 			where 		lower(propertyname) <> 'objectid'
 			order by 	ftSeq, propertyname
 		</cfquery>
-
 		<cfloop query="qMetadata">
 			<cfset querySetCell(qMetadata, "label", application.fapi.getPropertyMetadata(arguments.typename,qMetadata.field,"ftLabel",qMetadata.field), qMetadata.currentrow) />
 			<cfset querySetCell(qMetadata, "type", application.fc.lib.cloudsearch.getDefaultFieldType(application.stCOAPI[arguments.typename].stProps[qMetadata.field].metadata), qMetadata.currentrow) />
 		</cfloop>
 
+		<!--- Generated properties --->
+		<cfset qResult = getGeneratedProperties(arguments.typename) />
+		<cfloop query="qResult">
+			<cfif not listFindNoCase(valuelist(qMetadata.field),qResult.field)>
+				<cfset queryAddRow(qMetadata) />
+				<cfset querySetCell(qMetadata, "field", qResult.field) />
+				<cfset querySetCell(qMetadata, "label", "#qResult.label#") />
+				<cfset querySetCell(qMetadata, "type", qResult.type) />
+				<cfset querySetCell(qMetadata, "ftSeq", arraymax(listToArray(valuelist(qMetadata.ftSeq)))+1) />
+			</cfif>
+		</cfloop>
+
+		<!--- Missing properties --->
 		<cfloop array="#arguments.aCurrent#" index="stField">
 			<cfif not listFindNoCase(valuelist(qMetadata.field),stField.fieldName)>
 				<cfset queryAddRow(qMetadata) />
@@ -241,19 +260,36 @@
 		<cfset var i = 0 />
 		<cfset var qFields = "" />
 		<cfset var qMetadata = "" />
+
 		<cfset var stField = {} />
 
 		<cfif len(arguments.typename) and structKeyExists(application.stCOAPI,arguments.typename)>
-			<cfset qMetadata = application.stCOAPI[arguments.typename].qMetadata />
-
+			<cfset qMetadata = getGeneratedProperties(arguments.typename) />
+			
 			<cfloop from="#arraylen(arguments.aCurrent)#" to="1" index="i" step="-1">
-				<cfif structKeyExists(application.stCOAPI[arguments.typename].stProps,arguments.aCurrent[i].fieldName)>
+				<cfif structKeyExists(application.stCOAPI[arguments.typename].stProps, arguments.aCurrent[i].fieldName) or listFindNoCase(valuelist(qMetadata.field), arguments.aCurrent[i].fieldName)>
 					<cfset existingProperties = listappend(existingProperties,arguments.aCurrent[i].fieldName) />
 				<cfelseif not arguments.aCurrent[i].bIndex>
 					<cfset arrayDeleteAt(arguments.aCurrent,i) />
 				</cfif>
 			</cfloop>
 
+			<!--- Generated properties --->
+			<cfloop query="qMetadata">
+				<cfif not listFindNoCase(existingProperties,qMetadata.field)>
+					<cfset arrayappend(arguments.aCurrent, {
+						"fieldName" = qMetadata.field,
+						"fieldType" = qMetadata.type,
+						"weight" = 1,
+						"bIndex" = 0,
+						"bSort" = 0,
+						"bFacet" = 0
+					}) />
+				</cfif>
+			</cfloop>
+
+			<!--- Actual properties --->
+			<cfset qMetadata = application.stCOAPI[arguments.typename].qMetadata />
 			<cfloop query="qMetadata">
 				<cfif not listFindNoCase(existingProperties,qMetadata.propertyname)>
 					<cfset arrayappend(arguments.aCurrent, {
@@ -315,6 +351,34 @@
 			<cfset querySetCell(qResult,"highlight",0) />
 			<cfset querySetCell(qResult,"analysis_scheme","") />
 		</cfif>
+
+		<cfreturn qResult />
+	</cffunction>
+
+	<cffunction name="getGeneratedProperties" access="public" output="false" returntype="query">
+		<cfargument name="typename" type="string" required="true" />
+
+		<cfset var qResult = querynew("field,label,type") />
+		<cfset var prop = "" />
+
+		<cfloop collection="#application.stCOAPI[arguments.typename].stProps#" item="prop">
+			<cfif application.fapi.getPropertyMetadata(arguments.typename, prop, "type") eq "date">
+				<cfset queryAddRow(qResult) />
+				<cfset querySetCell(qResult, "field", prop & "_yyyy") />
+				<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Year)") />
+				<cfset querySetCell(qResult, "type", "literal") />
+
+				<cfset queryAddRow(qResult) />
+				<cfset querySetCell(qResult, "field", prop & "_yyyymmm") />
+				<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Month)") />
+				<cfset querySetCell(qResult, "type", "literal") />
+
+				<cfset queryAddRow(qResult) />
+				<cfset querySetCell(qResult, "field", prop & "_yyyymmmdd") />
+				<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Day)") />
+				<cfset querySetCell(qResult, "type", "literal") />
+			</cfif>
+		</cfloop>
 
 		<cfreturn qResult />
 	</cffunction>
@@ -487,7 +551,7 @@
 		<cfset stFields = application.fc.lib.cloudsearch.getTypeIndexFields(arguments.stObject.typename) />
 
 		<cfloop collection="#stFields#" item="field">
-			<cftry>
+			
 				<cfset property = stFields[field].property />
 
 				<!--- If there is a function in the type for this property, use that instead of the default --->
@@ -499,139 +563,202 @@
 					</cfinvoke>
 
 					<cfset stResult[field] = item />
-					<cfcontinue />
+				<cfelseif refind("_(yyyy(mmm(dd)?)?)$", property)>
+					<cfif application.fapi.showFarcryDate(arguments.stObject[rereplace(property, "_(yyyy(mmm(dd)?)?)$", "")])>
+						<cfset stResult[field] = dateFormat(arguments.stObject[rereplace(property, "_(yyyy(mmm(dd)?)?)$", "")], listlast(property, "_")) />
+					<cfelse>
+						<cfset stResult[field] = "none" />
+					</cfif>
+				<cfelseif structKeyExists(this, "process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#")>
+					<cfinvoke component="#this#" method="process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#" returnvariable="item">
+						<cfinvokeargument name="stObject" value="#arguments.stObject#" />
+						<cfinvokeargument name="property" value="#property#" />
+					</cfinvoke>
+
+					<cfset stResult[field] = item />
 				</cfif>
 
-				<cfswitch expression="#stFields[field].type#">
-					<cfcase value="date">
-						<cfset stResult[field] = application.fc.lib.cloudsearch.getRFC3339Date(arguments.stObject[property]) />
-					</cfcase>
-					<cfcase value="date-array">
-						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = [] />
-							<cfloop list="#arguments.stObject[property]#" index="item" delimiters=",#chr(10)##chr(13)#">
-								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
-							</cfloop>
-						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
-							<cfset stResult[field] = [] />
-							<cfloop array="#arguments.stObject[property]#" index="item">
-								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item.data)) />
-							</cfloop>
-						<cfelseif arrayLen(arguments.stObject[property])>
-							<cfset stResult[field] = [] />
-							<cfloop array="#arguments.stObject[property]#" index="item">
-								<cfset arrayAppend(stResult[field], application.fc.lib.cloudsearch.getRFC3339Date(item)) />
-							</cfloop>
-						</cfif>
-					</cfcase>
-
-					<cfcase value="double">
-						<cfif len(arguments.stObject[property])>
-							<cfset stResult[field] = int(arguments.stObject[property]) />
-						<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault"))>
-							<cfset stResult[field] = int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault")) />
-						<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "default"))>
-							<cfset stResult[field] = int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "default")) />
-						</cfif>
-					</cfcase>
-					<cfcase value="double-array">
-						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
-						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
-							<cfset stResult[field] = [] />
-							<cfloop array="#arguments.stObject[property]#" index="item">
-								<cfset arrayAppend(stResult[field], item.data) />
-							</cfloop>
-						<cfelseif arrayLen(arguments.stObject[property])>
-							<cfset stResult[field] = arguments.stObject[property] />
-						</cfif>
-					</cfcase>
-
-					<cfcase value="int">
-						<cfif len(arguments.stObject[property])>
-							<cfset stResult[field] = int(arguments.stObject[property]) />
-						<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault"))>
-							<cfset stResult[field] = int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault")) />
-						<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "default"))>
-							<cfset stResult[field] = int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "default")) />
-						</cfif>
-					</cfcase>
-					<cfcase value="int-array">
-						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
-						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
-							<cfset stResult[field] = [] />
-							<cfloop array="#arguments.stObject[property]#" index="item">
-								<cfset arrayAppend(stResult[field], item.data) />
-							</cfloop>
-						<cfelseif arrayLen(arguments.stObject[property])>
-							<cfset stResult[field] = arguments.stObject[property] />
-						</cfif>
-						<cfif structKeyExists(stResult,field)>
-							<cfloop from="1" to="#arraylen(stResult[field])#" index="i">
-								<cfset stResult[field][i] = int(stResult[field][i]) />
-							</cfloop>
-						</cfif>
-					</cfcase>
-
-					<cfcase value="lat-lon">
-						<cfset stResult[field] = arguments.stObject[property] />
-					</cfcase>
-
-					<cfcase value="literal">
-						<cfset stResult[field] = arguments.stObject[property] />
-					</cfcase>
-					<cfcase value="literal-array">
-						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = listToArray(arguments.stObject[property],",#chr(10)##chr(13)#") />
-						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
-							<cfset stResult[field] = [] />
-							<cfloop array="#arguments.stObject[property]#" index="item">
-								<cfset arrayAppend(stResult[field], item.data) />
-							</cfloop>
-						<cfelseif arrayLen(arguments.stObject[property])>
-							<cfset stResult[field] = arguments.stObject[property] />
-						</cfif>
-					</cfcase>
-
-					<cfcase value="text">
-						<cfif structkeyexists(application.stCOAPI[arguments.stObject.typename].stProps[property].metadata, "ftRichtextConfig")>
-							<cfset stResult[field] = rereplace(replace(arguments.stObject[property],chr(11)," ","ALL"), "<[^>]+>", " ", "ALL") />
-						<cfelse>
-							<cfset stResult[field] = replace(arguments.stObject[property],chr(11)," ","ALL") />
-						</cfif>
-					</cfcase>
-					<cfcase value="text-array">
-						<cfif isSimpleValue(arguments.stObject[property])>
-							<cfset stResult[field] = listToArray(replace(arguments.stObject[property],chr(11)," ","ALL"),",#chr(10)##chr(13)#") />
-						<cfelseif arrayLen(arguments.stObject[property]) and isstruct(arguments.stObject[property][1])>
-							<cfset stResult[field] = [] />
-							<cfloop array="#arguments.stObject[property]#" index="item">
-								<cfset arrayAppend(stResult[field], replace(item.data,chr(11)," ","ALL")) />
-							</cfloop>
-						<cfelseif arrayLen(arguments.stObject[property])>
-							<cfset stResult[field] = [] />
-							<cfloop array="#arguments.stObject[property]#" index="item">
-								<cfset arrayAppend(stResult[field], replace(item,chr(11)," ","ALL")) />
-							</cfloop>
-						</cfif>
-					</cfcase>
-				</cfswitch>
-
-				<cfcatch>
-					<cfset item = "" />
-					<cfif structKeyExists(arguments.stObject, property)>
-						<cfset item = arguments.stObject[property] />
-					</cfif>
-				    <cfset exception = createObject("java", "java.lang.Exception").init("error setting #stFields[field].type# #field# to value #serializeJSON(item)# from #arguments.stObject.typename#:#arguments.stObject.objectid# - #cfcatch.message#") />
-				    <cfset exception.initCause(cfcatch.getCause()) />
-				    <cfset exception.setStackTrace(cfcatch.getStackTrace()) />
-				    <cfthrow object="#exception#" />
-				</cfcatch>
-			</cftry>
 		</cfloop>
 
 		<cfreturn stResult />
+	</cffunction>
+
+	<cffunction name="processDate" access="public" output="false" returntype="string">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfreturn application.fc.lib.cloudsearch.getRFC3339Date(arguments.stObject[arguments.property]) />
+	</cffunction>
+
+	<cffunction name="processDateArray" access="public" output="false" returntype="string">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfset var aResult = [] />
+		<cfset var value = arguments.stObject[arguments.property] />
+		<cfset var item = "" />
+
+		<cfif isSimpleValue(value)>
+			<cfloop list="#value#" index="item" delimiters=",#chr(10)##chr(13)#">
+				<cfset arrayAppend(aResult, application.fc.lib.cloudsearch.getRFC3339Date(item)) />
+			</cfloop>
+		<cfelseif arrayLen(value) and isstruct(value[1])>
+			<cfloop array="#value#" index="item">
+				<cfset arrayAppend(aResult, application.fc.lib.cloudsearch.getRFC3339Date(item.data)) />
+			</cfloop>
+		<cfelseif arrayLen(value)>
+			<cfloop array="#value#" index="item">
+				<cfset arrayAppend(aResult, application.fc.lib.cloudsearch.getRFC3339Date(item)) />
+			</cfloop>
+		</cfif>
+
+		<cfreturn aResult />
+	</cffunction>
+
+	<cffunction name="processDouble" access="public" output="false" returntype="string">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfset var value = arguments.stObject[arguments.property] />
+
+		<cfif len(value)>
+			<cfreturn value />
+		<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, arguments.property, "ftDefault", ""))>
+			<cfreturn application.fapi.getPropertyMetadata(arguments.stObject.typename, arguments.property, "ftDefault") />
+		<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, arguments.property, "default", ""))>
+			<cfreturn application.fapi.getPropertyMetadata(arguments.stObject.typename, arguments.property, "default") />
+		</cfif>
+	</cffunction>
+
+	<cffunction name="processDoubleArray" access="public" output="false" returntype="array">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfset var aResult = [] />
+		<cfset var value = arguments.stObject[arguments.property] />
+		<cfset var item = "" />
+
+		<cfif isSimpleValue(value)>
+			<cfset aResult = listToArray(value, ",#chr(10)##chr(13)#") />
+		<cfelseif arrayLen(value) and isstruct(value[1])>
+			<cfloop array="#value#" index="item">
+				<cfset arrayAppend(aResult, item.data) />
+			</cfloop>
+		<cfelseif arrayLen(value)>
+			<cfset aResult = value />
+		</cfif>
+
+		<cfreturn aResult />
+	</cffunction>
+
+	<cffunction name="processInt" access="public" output="false" returntype="string">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfset var value = arguments.stObject[arguments.property] />
+
+		<cfif len(value)>
+			<cfreturn int(value) />
+		<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, arguments.property, "ftDefault", ""))>
+			<cfreturn int(application.fapi.getPropertyMetadata(arguments.stObject.typename, property, "ftDefault")) />
+		<cfelseif len(application.fapi.getPropertyMetadata(arguments.stObject.typename, arguments.property, "default", ""))>
+			<cfreturn int(application.fapi.getPropertyMetadata(arguments.stObject.typename, arguments.property, "default")) />
+		</cfif>
+	</cffunction>
+
+	<cffunction name="processIntArray" access="public" output="false" returntype="array">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfset var aResult = [] />
+		<cfset var value = arguments.stObject[arguments.property] />
+		<cfset var i = "" />
+		<cfset var item = "" />
+
+		<cfif isSimpleValue(value)>
+			<cfset aResult = listToArray(value,",#chr(10)##chr(13)#") />
+		<cfelseif arrayLen(value) and isstruct(value[1])>
+			<cfloop array="#value#" index="item">
+				<cfset arrayAppend(aResult, item.data) />
+			</cfloop>
+		<cfelseif arrayLen(value)>
+			<cfset aResult = value />
+		</cfif>
+		
+		<cfloop from="1" to="#arraylen(aResult)#" index="i">
+			<cfset aResult[i] = int(aResult[i]) />
+		</cfloop>
+
+		<cfreturn aResult />
+	</cffunction>
+
+	<cffunction name="processLatLon" access="public" output="false" returntype="string">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfreturn arguments.stObject[arguments.property] />
+	</cffunction>
+
+	<cffunction name="processLiteral" access="public" output="false" returntype="string">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfreturn arguments.stObject[arguments.property] />
+	</cffunction>
+
+	<cffunction name="processLiteralArray" access="public" output="false" returntype="array">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfset var aResult = [] />
+		<cfset var value = arguments.stObject[arguments.property] />
+		<cfset var item = "" />
+
+		<cfif isSimpleValue(value)>
+			<cfset aResult = listToArray(value,",#chr(10)##chr(13)#") />
+		<cfelseif arrayLen(value) and isstruct(value[1])>
+			<cfloop array="#value#" index="item">
+				<cfset arrayAppend(aResult, item.data) />
+			</cfloop>
+		<cfelseif arrayLen(value)>
+			<cfset aResult = value />
+		</cfif>
+
+		<cfreturn aResult />
+	</cffunction>
+
+	<cffunction name="processText" access="public" output="false" returntype="string">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfif structkeyexists(application.stCOAPI[arguments.stObject.typename].stProps[property].metadata, "ftRichtextConfig")>
+			<cfreturn rereplace(replace(arguments.stObject[property],chr(11)," ","ALL"), "<[^>]+>", " ", "ALL") />
+		<cfelse>
+			<cfreturn replace(arguments.stObject[property],chr(11)," ","ALL") />
+		</cfif>
+	</cffunction>
+
+	<cffunction name="processTextArray" access="public" output="false" returntype="array">
+		<cfargument name="stObject" type="struct" required="true" />
+		<cfargument name="property" type="string" required="true" />
+
+		<cfset var aResult = [] />
+		<cfset var value = arguments.stObject[arguments.property] />
+		<cfset var item = "" />
+
+		<cfif isSimpleValue(value)>
+			<cfset aResult = listToArray(replace(value,chr(11)," ","ALL"),",#chr(10)##chr(13)#") />
+		<cfelseif arrayLen(value) and isstruct(value[1])>
+			<cfloop array="#value#" index="item">
+				<cfset arrayAppend(aResult, replace(item.data,chr(11)," ","ALL")) />
+			</cfloop>
+		<cfelseif arrayLen(value)>
+			<cfloop array="#value#" index="item">
+				<cfset arrayAppend(aResult, replace(item,chr(11)," ","ALL")) />
+			</cfloop>
+		</cfif>
+
+		<cfreturn aResult />
 	</cffunction>
 
 </cfcomponent>

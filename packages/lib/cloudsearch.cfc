@@ -370,13 +370,12 @@ component {
 		};
 	}
 
-	public struct function search(string domain, string typename, string rawQuery, string queryParser="simple", string rawFilter, array conditions, array filters, numeric maxrows=10, numeric page=1, boolean log=true) {
+	public struct function search(string domain, string typename, string rawQuery, string queryParser="simple", string rawFilter, string rawFacets, array conditions, array filters, struct facets={}, numeric maxrows=10, numeric page=1, boolean log=true) {
 		var csdClient = "";
 		var searchRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.SearchRequest").init();
 		var searchResponse = {};
 		var hits = {};
 		var hit = {};
-		var facets = {};
 		var buckets = {};
 		var bucket = {};
 		var stIndexFields = {};
@@ -388,6 +387,7 @@ component {
 		var op = "";
 		var stResult = {};
 		var st = {};
+		var facetResult = {};
 
 		if (arguments.log){
 			arguments.log = false;
@@ -463,10 +463,36 @@ component {
 			}
 		}
 
+		// create facet config
+		if (not structKeyExists(arguments,"rawFacets")){
+			if (not structKeyExists(arguments,"facets")){
+				arguments.facets = {};
+			}
+
+			st = {};
+			for (key in arguments.facets) {
+				for (keyS in stIndexFields) {
+					if (stIndexFields[keyS].property eq key) {
+						st[stIndexFields[keyS].field] = arguments.facets[key];
+					}
+				}
+			}
+
+			if (structCount(st)){
+				arguments.rawFacets = serializeJSON(st);
+			}
+			else {
+				arguments.rawFacets = "";
+			}
+		}
+
 		searchRequest.setQueryParser(arguments.queryParser);
 		searchRequest.setQuery(arguments.rawQuery);
-		if (structKeyExists(arguments,"rawFilter") and len(arguments.rawFilter)){
+		if (len(arguments.rawFilter)){
 			searchRequest.setFilterQuery(arguments.rawFilter);
+		}
+		if (len(arguments.rawFacets)){
+			searchRequest.setFacet(arguments.rawFacets);
 		}
 		searchRequest.setStart(arguments.maxrows * (arguments.page - 1));
 		searchRequest.setSize(arguments.maxrows);
@@ -478,12 +504,12 @@ component {
 			throw(message=e.message, detail=serializeJSON(duplicate(arguments)));
 		}
 		hits = searchResponse.getHits();
-		facets = searchResponse.getFacets();
+		facetResult = searchResponse.getFacets();
 
 		stResult["time"] = searchResponse.getStatus().getTimems();
 		stResult["cursor"] = hits.getCursor();
 		stResult["items"] = querynew("objectid,typename,highlights");
-		stResult["facets"] = querynew("field,value,count","varchar,varchar,int");
+		stResult["stFacets"] = {};
 		if (structKeyExists(arguments,"conditions")){
 			stResult["conditions"] = arguments.conditions;
 		}
@@ -493,6 +519,10 @@ component {
 			stResult["filters"] = arguments.filters;
 		}
 		stResult["rawFilter"] = arguments.rawFilter;
+		if (structKeyExists(arguments,"facets")){
+			stResult["facets"] = arguments.facets;
+		}
+		stResult["rawFacets"] = arguments.rawFacets;
 		stResult["recordcount"] = hits.getFound();
 		stResult["page"] = arguments.page;
 		stResult["maxrows"] = arguments.maxrows;
@@ -504,14 +534,12 @@ component {
 			querySetCell(stResult.items,"highlights",serializeJSON(duplicate(hit.getHighlights())));
 		}
 
-		for (key in facets){
-			buckets = facets[key].getBuckets;
+		for (key in facetResult){
+			buckets = facetResult[key].getBuckets();
+			stResult["stFacets"][stIndexFields[key].property] = [];
 
 			for (bucket in buckets){
-				queryAddRow(stResult.facets);
-				querySetCell(stResult.facets,"field",key);
-				querySetCell(stResult.facets,"value",bucket.getValue());
-				querySetCell(stResult.facets,"count",bucket.getCount());
+				arrayappend(stResult["stFacets"][stIndexFields[key].property], { "value"=bucket.getValue(), "count"=bucket.getCount() });
 			}
 		}
 
