@@ -1,6 +1,6 @@
 # AWS Cloudsearch Plugin
 
-Cloudsearch Plugin interfaces with the [Amazon Cloudsearch](https://aws.amazon.com/cloudsearch/) service to provide search capabilities for any FarCry application. Cloudsearch is an API based implementation of the SOLR serach engine, and the plugin works similarly to the FarCry [Solr Pro Plugin].
+Cloudsearch Plugin interfaces with the [Amazon Cloudsearch](https://aws.amazon.com/cloudsearch/) service to provide search capabilities for any FarCry application. Cloudsearch is an API based implementation of the SOLR serach engine, and the plugin works similarly to the FarCry [Solr Pro Plugin](https://github.com/jeffcoughlin/farcrysolrpro).
 
 NOTE: This plugin is compatible with FarCry 7.x and over.
 
@@ -17,7 +17,7 @@ Base features include:
 
 ### Setup
 
-- Set up an account with AWS Cloudsearch
+- Set up an account with [Amazon Cloudsearch](https://aws.amazon.com/cloudsearch/)
 - Add this plugin to the project's plugin directory ./plugins/cloudsearch
 - Register the plugin in the projects constructor; ./www/farcryConstructor.cfm
 - Restart your application
@@ -49,19 +49,17 @@ Notes about [CloudSearch] architecture:
 7. Bulk update function for 
    - new indexes
    - changed index configs, i.e. adding properties to index
+8. Faceted searches
 
 ### Cloudsearch Features Not Yet Implemented
 
-For references, these features will not be implemented at this time:
+We didn't get time for some features, but would like to have them included at some point:
 
-- a default search form / interface (that will need to be implemented 
-  in the project)
+- a default search form and results interface (this needs to be implemented in the project)
 - document boosting / search
 - search term highlighting
 - autocomplete / suggestions
-- facets
-- document content
+- file document content (such as PDF, DOC, etc)
 
 
-[Solr Pro Plugin]: https://github.com/jeffcoughlin/farcrysolrpro
-[CloudSearch]: http://docs.aws.amazon.com/cloudsearch/latest/developerguide/what-is-cloudsearch.html
+
