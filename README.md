@@ -26,7 +26,7 @@ Base features include:
 
 ### AWS Cloudsearch
 
-Notes about [CloudSearch] architecture:
+Notes about CloudSearch architecture:
 
 - index configs (i.e. fields, field types, weighting) are pre-defined 
   in CloudSearch
@@ -36,7 +36,7 @@ Notes about [CloudSearch] architecture:
   next index, and indexing will fail until the offending documents are 
   updated
 
-### Cloudsearch Features Implmented
+### Cloudsearch Features Implemented
 
 1. CloudSearch initialization, discovery, and basic troubleshooting tools,
    i.e. are we connected, how many documents are there 
