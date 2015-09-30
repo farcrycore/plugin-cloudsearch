@@ -1,6 +1,6 @@
 # AWS Cloudsearch Plugin
 
-Cloudsearch Plugin interfaces with the [Amazon Cloudsearch](https://aws.amazon.com/cloudsearch/) service to provide search capabilities for any FarCry application. Cloudsearch is an API based implementation of the SOLR serach engine, and the plugin works similarly to the FarCry [Solr Pro Plugin](https://github.com/jeffcoughlin/farcrysolrpro).
+Cloudsearch Plugin interfaces with the [Amazon Cloudsearch](https://aws.amazon.com/cloudsearch/) service to provide search capabilities for any FarCry application. Cloudsearch is an API based implementation of the SOLR search engine, and the plugin works similarly to the FarCry [Solr Pro Plugin](https://github.com/jeffcoughlin/farcrysolrpro).
 
 NOTE: This plugin is compatible with FarCry 7.x and over.
 
