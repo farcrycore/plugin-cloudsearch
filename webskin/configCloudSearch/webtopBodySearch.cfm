@@ -355,14 +355,16 @@
 							</tr>
 						</thead>
 						<tbody>
-							<cfloop query="stSearch.facets">
-								<tr>
-									<td>#stSearch.facets.field#</td>
-									<td>#stSearch.facets.value#</td>
-									<td>#stSearch.facets.count#</td>
-								</tr>
+							<cfloop collection="stSearch.stFacets" item="field">
+								<cfloop array="#stSearch.stFacets[field]#" index="facet">
+									<tr>
+										<td>#field#</td>
+										<td>#facet.value#</td>
+										<td>#facet.count#</td>
+									</tr>
+								</cfloop>
 							</cfloop>
-							<cfif stSearch.facets.recordcount eq 0>
+							<cfif structsize(stSearch.stFacets) eq 0>
 								<tr>
 									<td colspan="3">No facets returned</td>
 								</tr>

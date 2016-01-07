@@ -429,6 +429,10 @@ component {
 			if (arraylen(arguments.conditions) gt 1){
 				arguments.rawQuery = "(and " & chr(10) & arguments.rawQuery & chr(10) & ")";
 			}
+
+			if (arguments.rawQuery eq "") {
+				arguments.rawQuery = "matchall";
+			}
 		}
 
 		// create filter
