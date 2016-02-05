@@ -1,4 +1,4 @@
-<cfcomponent output="false" extends="farcry.core.packages.types.types" displayname="CloudSearch Content Type" hint="Manages content type index information" bFriendly="false" bObjectBroker="false" bSystem="true" bRefObjects="false">
+<cfcomponent output="false" extends="farcry.core.packages.types.types" displayname="CloudSearch Content Type" hint="Manages content type index information" bFriendly="false" bObjectBroker="false" bSystem="true" bRefObjects="true">
 	
 	<cfproperty name="contentType" type="nstring" required="true" 
 		ftSeq="2" ftFieldset="CloudSearch Content Type" ftLabel="Content Type" 
