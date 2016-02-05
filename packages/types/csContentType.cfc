@@ -54,7 +54,7 @@
 		</cfif>
 		
 		<!--- check for duplicates --->
-		<cfset qDupeCheck = application.fapi.getContentObjects(typename="csContentType",contentType_eq=trim(arguments.stFieldPost.value),objectid_eq=arguments.objectid) />
+		<cfset qDupeCheck = application.fapi.getContentObjects(typename="csContentType",contentType_eq=trim(arguments.stFieldPost.value),objectid_neq=arguments.objectid) />
 		<cfif qDupeCheck.recordCount gt 0>
 			<cfreturn oField.failed(value=arguments.stFieldPost.value, message="There is already a configuration created for this content type.") />
 		</cfif>
