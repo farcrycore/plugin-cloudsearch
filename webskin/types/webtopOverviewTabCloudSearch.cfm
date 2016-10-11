@@ -37,7 +37,10 @@
 
 <cfset stDoc = application.fapi.getContentType("csContentType").getCloudsearchDocument(stObject=stObj) />
 <cfset jsonOut = application.fapi.formatJSON(serializeJSON(stDoc)) />
-<ft:field label="Document"><cfoutput><pre class="formatjson">#jsonOut#</pre></cfoutput></ft:field>
+<ft:field label="Document"><cfoutput>
+	<pre class="formatjson">#jsonOut#</pre>
+	<p><a href='#application.fapi.getLink(type="csContentType", view="ajaxPush", urlParameters="pushtype=#stObj.typename#&pushID=#stObj.objectid#")#' onclick="$j(this).find('.info').remove().end().prepend('<i class=\'fa fa-spinner fa-spin info\'></i> '); $j.ajax({ url:this.href, dataType:'json', success:function(data){ $j(this).find('.fa').remove().end().append(' <span class=\'info\' style=\'text-decoration:none;cursor:default;'+(data.success ? 'color:green;' : 'color:red;')+'\'>'+data.message+'</span>'); }, context:this }); return false;">Push update to CloudSearch</a></p>
+</cfoutput></ft:field>
 
 <cfset stResult = application.fc.lib.cloudsearch.search(typename=stObj.typename,conditions=[{ "property"="objectid", "term"=stObj.objectid }]) />
 <cfoutput><h2>Object ID Search</h2></cfoutput>
