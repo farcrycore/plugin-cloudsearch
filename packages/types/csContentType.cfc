@@ -360,25 +360,40 @@
 
 		<cfset var qResult = querynew("field,label,type") />
 		<cfset var prop = "" />
+		<cfset var oType = application.fapi.getContentType(arguments.stObject.typename) />
 
-		<cfloop collection="#application.stCOAPI[arguments.typename].stProps#" item="prop">
-			<cfif application.fapi.getPropertyMetadata(arguments.typename, prop, "type") eq "date">
+		<!--- If there is a function in the type for this property, use that instead of the default --->
+		<cfif structKeyExists(oType,"getCloudsearchGeneratedProperties")>
+			<cfinvoke component="#oType#" method="getCloudsearchGeneratedProperties" returnvariable="qResult">
+				<cfinvokeargument name="typename" value="#arguments.typename#" />
+			</cfinvoke>
+		<cfelse>
+			<cfif not structKeyExists(application.stCOAPI[arguments.typename].stProps, "status")>
 				<cfset queryAddRow(qResult) />
-				<cfset querySetCell(qResult, "field", prop & "_yyyy") />
-				<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Year)") />
-				<cfset querySetCell(qResult, "type", "literal") />
-
-				<cfset queryAddRow(qResult) />
-				<cfset querySetCell(qResult, "field", prop & "_yyyymmm") />
-				<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Month)") />
-				<cfset querySetCell(qResult, "type", "literal") />
-
-				<cfset queryAddRow(qResult) />
-				<cfset querySetCell(qResult, "field", prop & "_yyyymmmdd") />
-				<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Day)") />
+				<cfset querySetCell(qResult, "field", "status") />
+				<cfset querySetCell(qResult, "label", "Status") />
 				<cfset querySetCell(qResult, "type", "literal") />
 			</cfif>
-		</cfloop>
+
+			<cfloop collection="#application.stCOAPI[arguments.typename].stProps#" item="prop">
+				<cfif application.fapi.getPropertyMetadata(arguments.typename, prop, "type") eq "date">
+					<cfset queryAddRow(qResult) />
+					<cfset querySetCell(qResult, "field", prop & "_yyyy") />
+					<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Year)") />
+					<cfset querySetCell(qResult, "type", "literal") />
+
+					<cfset queryAddRow(qResult) />
+					<cfset querySetCell(qResult, "field", prop & "_yyyymmm") />
+					<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Month)") />
+					<cfset querySetCell(qResult, "type", "literal") />
+
+					<cfset queryAddRow(qResult) />
+					<cfset querySetCell(qResult, "field", prop & "_yyyymmmdd") />
+					<cfset querySetCell(qResult, "label", application.fapi.getPropertyMetadata(arguments.typename, prop, "ftLabel", prop) & " (Day)") />
+					<cfset querySetCell(qResult, "type", "literal") />
+				</cfif>
+			</cfloop>
+		</cfif>
 
 		<cfreturn qResult />
 	</cffunction>
@@ -572,6 +587,8 @@
 					<cfelse>
 						<cfset stResult[field] = "none" />
 					</cfif>
+				<cfelseif property eq "status" and not structKeyExists(application.stCOAPI[arguments.stObject.typename].stProps, "status")>
+					<cfset stREsult[field] = "approved" />
 				<cfelseif structKeyExists(this, "process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#")>
 					<cfinvoke component="#this#" method="process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#" returnvariable="item">
 						<cfinvokeargument name="stObject" value="#arguments.stObject#" />
