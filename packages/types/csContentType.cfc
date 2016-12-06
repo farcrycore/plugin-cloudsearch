@@ -141,7 +141,7 @@
 							<td>
 								<input type="hidden" name="#arguments.fieldname#field#i#" value="#thisobject.fieldName#" />
 								<cfloop query="qFields">
-									<cfif qFields.field eq thisobject.fieldName><span title="#qFields.field#">#qFields.label#</span></cfif>
+									<cfif qFields.field eq thisobject.fieldName><span title="#qFields.field#">#qFields.label#<br><small>#application.fapi.getPropertyMetadata(typename=arguments.stObject.contentType, property=qFields.field, md="ftFieldset", default="")#</small></span></cfif>
 								</cfloop>
 							</td>
 							<td>

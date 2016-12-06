@@ -370,7 +370,7 @@ component {
 		};
 	}
 
-	public struct function search(string domain, string typename, string rawQuery, string queryParser="simple", string rawFilter, string rawFacets, array conditions, array filters, struct facets={}, numeric maxrows=10, numeric page=1, boolean log=true) {
+	public struct function search(string domain, string typename, string rawQuery, string queryParser="simple", string rawFilter, string rawFacets, array conditions, array filters, struct facets={}, numeric maxrows=10, numeric page=1, boolean log=true, string sort="_score desc") {
 		var csdClient = "";
 		var searchRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.SearchRequest").init();
 		var searchResponse = {};
@@ -500,6 +500,7 @@ component {
 		}
 		searchRequest.setStart(arguments.maxrows * (arguments.page - 1));
 		searchRequest.setSize(arguments.maxrows);
+		searchRequest.setSort(arguments.sort);
 
 		try {
 			searchResponse = csdClient.search(searchRequest);
@@ -1160,7 +1161,7 @@ component {
 			application.fc.lib.redisClients["#host#:#port#"] = newclient;
 		}
 
-		if (structKeyExists(application.fc.lib.redisClients,"#host#:#port#")){
+		if (structKeyExists(application.fc.lib,"redisClients") and structKeyExists(application.fc.lib.redisClients,"#host#:#port#")){
 			return application.fc.lib.redisClients["#host#:#port#"];
 		}
 		else {
