@@ -609,7 +609,7 @@
 		<cfargument name="stObject" type="struct" required="true" />
 		<cfargument name="property" type="string" required="true" />
 
-		<cfif isDate((arguments.stObject[arguments.property])>
+		<cfif isDate(arguments.stObject[arguments.property])>
 			<cfreturn application.fc.lib.cloudsearch.getRFC3339Date(arguments.stObject[arguments.property]) />
 		<cfelse>
 			<cfreturn "" />
