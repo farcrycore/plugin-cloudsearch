@@ -358,7 +358,15 @@ component {
 		uploadDocumentsRequest.setContentLength(getFileInfo(documentFile).size);
 		uploadDocumentsRequest.setContentType(contentType);
 
-		uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
+		try {
+			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
+		}
+		catch (com.amazonaws.services.cloudsearchdomain.model.SearchException e) {
+			if (len(arguments.documents) lt 500000)
+				throw(message=e.message, detail='{"domain":arguments.domain, "documents"=#arguments.documents#}');
+			else
+				throw(message=e.message, detail='{"domain":arguments.domain, "documents"="#left(arguments.documents,500000)#"}');
+		}
 
 		// remove temporary file
 		application.fc.lib.cdn.ioDeleteFile(location="temp",file="/cloudsearch/documents-#id#.json");
