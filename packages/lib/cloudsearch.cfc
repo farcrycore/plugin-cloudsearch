@@ -3,7 +3,7 @@ component {
 	public any function init(){
 		this.fieldCache = {};
 		this.domainEndpoints = {};
-		this.invalidchars = createObject("java", "java.util.regex.Pattern").compile( javaCast( "string", "/[^\u0009\u000a\u000d\u0020-\uD7FF\uE000-\uFFFD]/" ) ) />
+		this.invalidchars = createObject("java", "java.util.regex.Pattern").compile( javaCast( "string", "/[^\u0009\u000a\u000d\u0020-\uD7FF\uE000-\uFFFD]/" ) );
 
 		return this;
 	}
