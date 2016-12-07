@@ -595,7 +595,9 @@
 						<cfinvokeargument name="property" value="#property#" />
 					</cfinvoke>
 
-					<cfset stResult[field] = item />
+					<cfif len(item)>
+						<cfset stResult[field] = item />
+					</cfif>
 				</cfif>
 
 		</cfloop>
@@ -607,7 +609,11 @@
 		<cfargument name="stObject" type="struct" required="true" />
 		<cfargument name="property" type="string" required="true" />
 
-		<cfreturn application.fc.lib.cloudsearch.getRFC3339Date(arguments.stObject[arguments.property]) />
+		<cfif isDate((arguments.stObject[arguments.property])>
+			<cfreturn application.fc.lib.cloudsearch.getRFC3339Date(arguments.stObject[arguments.property]) />
+		<cfelse>
+			<cfreturn "" />
+		</cfif>
 	</cffunction>
 
 	<cffunction name="processDateArray" access="public" output="false" returntype="string">
