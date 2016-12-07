@@ -3,7 +3,7 @@ component {
 	public any function init(){
 		this.fieldCache = {};
 		this.domainEndpoints = {};
-		this.invalidchars = createObject("java", "java.util.regex.Pattern").compile( javaCast( "string", "/[^\u0009\u000a\u000d\u0020-\uD7FF\uE000-\uFFFD]/" ) );
+		this.invalidchars = createObject("java", "java.util.regex.Pattern").compile( javaCast( "string", "[^\x{0009}\x{000a}\x{000d}\x{0020}-\x{D7FF}\x{E000}-\x{FFFD}]" ) );
 
 		return this;
 	}
@@ -351,7 +351,7 @@ component {
 		application.fc.lib.cdn.ioWriteFile(location="temp",file="/cloudsearch/documents-#id#.json",data=arguments.documents);
 		documentFile = application.fc.lib.cdn.ioGetFileLocation(location="temp",file="/cloudsearch/documents-#id#.json",bRetrieve=true).path;
 		inputStream = createobject("java","java.io.FileInputStream").init(documentFile);
-			
+
 		csdClient = getClient("domain", arguments.domain);
 
 		uploadDocumentsRequest.setDocuments(inputStream);
