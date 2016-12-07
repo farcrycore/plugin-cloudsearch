@@ -360,7 +360,7 @@
 
 		<cfset var qResult = querynew("field,label,type") />
 		<cfset var prop = "" />
-		<cfset var oType = application.fapi.getContentType(arguments.stObject.typename) />
+		<cfset var oType = application.fapi.getContentType(arguments.typename) />
 
 		<!--- If there is a function in the type for this property, use that instead of the default --->
 		<cfif structKeyExists(oType,"getCloudsearchGeneratedProperties")>
