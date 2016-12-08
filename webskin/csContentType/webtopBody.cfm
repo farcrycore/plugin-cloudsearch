@@ -57,26 +57,16 @@
 	r_oTypeAdmin="oTypeAdmin">
 
 	<cfset stAttributes = oTypeAdmin.getAttributes()>
-	<!--- <cfset arrayappend(stAttributes.aButtons,{
-		type="button",
-		name="disablelisteners",
-		value="Disable Listeners",
-		class="f-submit",
-		buttontype="disablelisteners",
-		icon="fa-times",
-		permission="developer",
-		onclick=""
-	}) />
 	<cfset arrayappend(stAttributes.aButtons,{
 		type="button",
-		name="enablelisteners",
-		value="Enable Listeners",
+		name="uploadAll",
+		value="Upload All Documents",
 		class="f-submit",
-		buttontype="enablelisteners",
-		icon="fa-check",
+		buttontype="uyploadAll",
+		icon="fa-upload",
 		permission="developer",
-		onclick=""
-	}) /> --->
+		onclick="$fc.objectAdminAction('Upload All Documents', '/webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyUploadAll'); return false;"
+	}) />
 	<cfset oTypeAdmin.setAttribute("aButtons",stAttributes.aButtons)>
 
 </ft:objectAdmin>
