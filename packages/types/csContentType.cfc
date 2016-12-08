@@ -729,7 +729,7 @@
 		<cfargument name="stObject" type="struct" required="true" />
 		<cfargument name="property" type="string" required="true" />
 
-		<cfreturn arguments.stObject[arguments.property] />
+		<cfreturn application.fc.lib.cloudsearch.sanitizeString(arguments.stObject[arguments.property]) />
 	</cffunction>
 
 	<cffunction name="processLiteralArray" access="public" output="false" returntype="array">
@@ -757,11 +757,15 @@
 		<cfargument name="stObject" type="struct" required="true" />
 		<cfargument name="property" type="string" required="true" />
 
+		<cfset var result = "" />
+
 		<cfif structkeyexists(application.stCOAPI[arguments.stObject.typename].stProps[property].metadata, "ftRichtextConfig")>
-			<cfreturn rereplace(replace(arguments.stObject[property],chr(11)," ","ALL"), "<[^>]+>", " ", "ALL") />
+			<cfset result = rereplace(arguments.stObject[property], "<[^>]+>", " ", "ALL") />
 		<cfelse>
-			<cfreturn replace(arguments.stObject[property],chr(11)," ","ALL") />
+			<cfset result = arguments.stObject[property] />
 		</cfif>
+
+		<cfreturn application.fc.lib.cloudsearch.sanitizeString(result) />
 	</cffunction>
 
 	<cffunction name="processTextArray" access="public" output="false" returntype="array">
@@ -773,14 +777,14 @@
 		<cfset var item = "" />
 
 		<cfif isSimpleValue(value)>
-			<cfset aResult = listToArray(replace(value,chr(11)," ","ALL"),",#chr(10)##chr(13)#") />
+			<cfset aResult = listToArray(application.fc.lib.cloudsearch.sanitizeString(value),",#chr(10)##chr(13)#") />
 		<cfelseif arrayLen(value) and isstruct(value[1])>
 			<cfloop array="#value#" index="item">
-				<cfset arrayAppend(aResult, replace(item.data,chr(11)," ","ALL")) />
+				<cfset arrayAppend(aResult, application.fc.lib.cloudsearch.sanitizeString(item.data)) />
 			</cfloop>
 		<cfelseif arrayLen(value)>
 			<cfloop array="#value#" index="item">
-				<cfset arrayAppend(aResult, replace(item,chr(11)," ","ALL")) />
+				<cfset arrayAppend(aResult, application.fc.lib.cloudsearch.sanitizeString(item)) />
 			</cfloop>
 		</cfif>
 

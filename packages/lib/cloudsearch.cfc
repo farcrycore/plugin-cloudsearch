@@ -338,14 +338,10 @@ component {
 		var warning = {};
 		var id = application.fapi.getUUID();
 		var documentFile = "";
-		var matcher = this.invalidchars.matcher( javaCast( "string", arguments.documents ) );
 
 		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
 			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
 		}
-
-		// clean documents JSON
-		arguments.documents = matcher.replaceAll( javaCast( "string", "" ) );
 
 		// create temporary file for streaming into the SDK
 		application.fc.lib.cdn.ioWriteFile(location="temp",file="/cloudsearch/documents-#id#.json",data=arguments.documents);
@@ -564,6 +560,12 @@ component {
 		return stResult;
 	}
 
+
+	public string function sanitizeString(required string input) {
+		var matcher = this.invalidchars.matcher( javaCast( "string", arguments.input ) );
+
+		return matcher.replaceAll( javaCast( "string", "" ) );
+	}
 
 	/* CloudSearch Utility functions */
 	private query function createIndexQuery(){
