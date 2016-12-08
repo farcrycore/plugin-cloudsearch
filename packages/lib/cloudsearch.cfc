@@ -361,7 +361,7 @@ component {
 		try {
 			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
 		}
-		catch (com.amazonaws.services.cloudsearchdomain.model.SearchException e) {
+		catch (com.amazonaws.services.cloudsearchdomain.model.DocumentServiceException e) {
 			if (len(arguments.documents) lt 500000)
 				throw(message=e.message, detail='{"domain":arguments.domain, "documents"=#arguments.documents#}');
 			else
