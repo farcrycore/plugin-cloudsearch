@@ -44,7 +44,7 @@
 		<cfset var st = application.fc.lib.cloudsearch.getTypeIndexFields(arguments.typename) />
 
 		<cfif not structIsEmpty(st)>
-			<cfset application.fapi.getContentType("csContentType").importIntoCloudSearch(stObject=arguments.stProperties, operation="deleted") />
+			<cfset application.fapi.getContentType("csContentType").importIntoCloudSearch(stObject=arguments.stObject, operation="deleted") />
 		</cfif>
 	</cffunction>
 	
