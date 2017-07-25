@@ -355,7 +355,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							<cfloop collection="stSearch.stFacets" item="field">
+							<cfloop collection="#stSearch.stFacets#" item="field">
 								<cfloop array="#stSearch.stFacets[field]#" index="facet">
 									<tr>
 										<td>#field#</td>
@@ -364,7 +364,7 @@
 									</tr>
 								</cfloop>
 							</cfloop>
-							<cfif structsize(stSearch.stFacets) eq 0>
+							<cfif structcount(stSearch.stFacets) eq 0>
 								<tr>
 									<td colspan="3">No facets returned</td>
 								</tr>

@@ -454,9 +454,9 @@
 		<cfset strOut.append("[") />
 
 		<cfloop query="qContent">
-			<cfset stObject = oContent.getData(objectid=qContent.objectid) />
 
 			<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(stObject=stObject))>
+				<cfset stObject = oContent.getData(objectid=qContent.objectid) />
 				<cfset stContent = getCloudsearchDocument(stObject=stObject) />
 				
 				<cfset strOut.append('{"type":"add","id":"') />
