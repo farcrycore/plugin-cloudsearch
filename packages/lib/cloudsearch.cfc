@@ -11,17 +11,18 @@ component {
 	public query function getAllContentTypes(string lObjectIDs=""){
 		var stArgs = {
 			"typename" = "csContentType",
-			"lProperties" = "objectid,contentType,title",
-			"orderBy" = "title"
+			"lProperties" = "objectid,contentType,label",
+			"orderBy" = "contentType"
 		}
 
 		if (listLen(arguments.lObjectIds)){
 			stArgs["objectid_in"] = arguments.lObjectIds;
 		}
 
-		if (bIncludeNonSearchable eq false){
-			stArgs["objectid_in"] = arguments.lObjectIds;
-		}
+		// TODO:  throws error
+		// if (bIncludeNonSearchable eq false){
+		//	stArgs["objectid_in"] = arguments.lObjectIds;
+		//}
 		
 		return application.fapi.getContentObjects(argumentCollection=stArgs);
 	}
