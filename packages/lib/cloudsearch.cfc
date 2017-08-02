@@ -941,6 +941,19 @@ component {
 				}
 			}
 		}
+		else if (structKeyExists(arguments,"dateafter")){
+			for (key in arguments.stIndexFields){
+				if (arguments.stIndexFields[key].property eq arguments.property) {
+					if (arguments.bBoost){
+						boost = " boost=#arguments.stIndexFields[key].weight#";
+					}
+					
+					str = "{,'#getRFC3339Date(arguments.dateafter)#']";
+					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent) & "(range field='#arguments.stIndexFields[key].field#'#boost# #str#)");
+				}
+			}
+
+		}
 
 		if (arrayLen(aSubQuery) gt 1){
 			return repeatstring(" ",arguments.indent) & "(or " & chr(10) & arrayToList(aSubQuery,chr(10)) & chr(10) & repeatstring(" ",arguments.indent) & ")";

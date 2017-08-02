@@ -568,10 +568,8 @@
 
 		<cfset stFields = application.fc.lib.cloudsearch.getTypeIndexFields(arguments.stObject.typename) />
 
-		<cfloop collection="#stFields#" item="field">
-			
-				<cfset property = stFields[field].property />
-
+		<cfloop collection="#stFields#" item="field">			
+				<cfset property = stFields[field].property />		
 				<!--- If there is a function in the type for this property, use that instead of the default --->
 				<cfif structKeyExists(oType,"getCloudsearch#property#")>
 					<cfinvoke component="#oType#" method="getCloudsearch#property#" returnvariable="item">
@@ -588,7 +586,7 @@
 						<cfset stResult[field] = "none" />
 					</cfif>
 				<cfelseif property eq "status" and not structKeyExists(application.stCOAPI[arguments.stObject.typename].stProps, "status")>
-					<cfset stREsult[field] = "approved" />
+					<cfset stREsult[field] = "approved" />					
 				<cfelseif structKeyExists(this, "process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#")>
 					<cfinvoke component="#this#" method="process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#" returnvariable="item">
 						<cfinvokeargument name="stObject" value="#arguments.stObject#" />
@@ -601,6 +599,11 @@
 				</cfif>
 
 		</cfloop>
+
+		<!--- if no publishdate, set  to datetimecreated --->	
+		<cfif NOT structKeyExists(stResult,'publishdate_date')>
+			<cfset stResult['publishdate_date'] = processDate(arguments.stObject, 'datetimecreated') />
+		</cfif>
 
 		<cfreturn stResult />
 	</cffunction>
