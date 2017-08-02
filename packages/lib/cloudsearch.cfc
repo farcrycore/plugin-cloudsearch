@@ -360,9 +360,9 @@ component {
 		}
 		catch (com.amazonaws.services.cloudsearchdomain.model.DocumentServiceException e) {
 			if (len(arguments.documents) lt 500000)
-				throw(message=e.message, detail='{"domain":arguments.domain, "documents"=#arguments.documents#}');
+				throw(message=e.message, detail='{"domain":"#arguments.domain#", "documents":#arguments.documents#}');
 			else
-				throw(message=e.message, detail='{"domain":arguments.domain, "documents"="#left(arguments.documents,500000)#"}');
+				throw(message=e.message, detail='{"domain":"#arguments.domain#", "documents":"#left(arguments.documents,500000)#"}');
 		}
 
 		// remove temporary file
