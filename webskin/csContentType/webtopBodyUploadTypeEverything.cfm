@@ -14,7 +14,7 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 	
 	<cfset requestSize = "5000000" />
 	
-	<cfoutput><h1>AWS CloudSearch :: webtopBodyUploadTypeEverything(#URL.CONTENTTYPE#)</h1></cfoutput><cfflush interval="1">
+	<cfoutput><h1>Index all '#URL.CONTENTTYPE#' records</h1></cfoutput>
 		
 	<cfparam name="APPLICATION.webtopBodyUploadTypeEverything" default="#StructNew()#">
 	
@@ -32,22 +32,23 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 		<cfset more =  recordCount GT 0>
 	
 		<cfif more>
-			<cfif recordCount LT URL.maxRows>
-				<cfset URL.maxRows = recordCount>
+			<cfif recordCount GT URL.maxRows>
+				<cfset recordCount = URL.maxRows>
 			</cfif>
 			
 			<cfset contentIDs = "">
-			<cfloop from="1" to="#URL.maxRows#" index="c">
+			<cfloop from="1" to="#recordCount#" index="c">
 				<cfset contentID = ListGetAt(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE], c)>
 				<cfset contentIDs =  ListAppend(contentIDs, contentID)>
 			</cfloop>
-			
 			
 			<cfset qContent = getRecordsToUpdate(URL.CONTENTTYPE, contentIDs)>
 			
 			<cfset strOut.append("[") />
 			<cfloop query="qContent">
-				
+				<!--- remove from application scope --->
+				<cfset APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE] = ListDeleteAt(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE], 1)>
+
 				<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(stObject=stObject))>
 					<cfset stObject = oContent.getData(objectid=qContent.objectid) />
 					<cfset stContent = getCloudsearchDocument(stObject=stObject) />
@@ -69,41 +70,39 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 				<cfelse>
 					<cfset strOut.append(",") />
 				</cfif>
-				
-				<!--- remove from application scope --->
-				<cfset APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE] = ListDeleteAt(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE], 1)>
+
 			</cfloop>
 			<cfset strOut.append("]") />
 					
 			<cfif count>
 				<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
-				<cfdump var="#stResult#" label="AJM stResult" expand="Yes" abort="No"  />
+				<cfdump var="#stResult#" label="Status" expand="Yes" abort="No"  />
 				<cflog file="cloudsearch" text="webtopBodyUploadTypeEverything(#URL.contentType#): Updated #count# record/s" />
 			</cfif>
 	
 			<cfset recordCount = ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])>
 			<cfset more =  recordCount GT 0>
-					<cfif more>
+			<cfif more>
 				<cfoutput>
-					<cfoutput><h4>#ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])# more to process ...</h4><p>#Now()#</p></cfoutput><cfflush>
-		
+					<h4>#ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])# more to process ...</h4><p>#Now()#</p>
+
 				     <script type="text/javascript">
 			         <!--
 			           window.location="/webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyUploadTypeEverything&CONTENTTYPE=#URL.contentType#&start=false&maxRows=#URL.maxRows#"; 
 			         //-->
 			      </script>
 				</cfoutput>
-	
+				
 			<cfelse>
 				<cfoutput><h4>All Done</h4></cfoutput>
 			</cfif>
-	
-	
 	
 		<cfelse>
 			<cfoutput><p>nothing to process</p></cfoutput>
 		</cfif>
 		<cfcatch>
+			<cfdump var="#recordCount#" label="AJM recordCount" expand="Yes" abort="No"  />
+			<cfdump var="#ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])#" label="AJM ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])" expand="Yes" abort="No"  />
 			<cfdump var="#cfcatch#" label="cfcatch" abort="true">
 		</cfcatch>
 	</cftry>

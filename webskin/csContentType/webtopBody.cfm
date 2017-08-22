@@ -39,6 +39,18 @@
 	<skin:bubble tags="success" message="<button class='close' style='margin-right:10px;' type='button' onclick='$j(this).siblings(""pre"").toggle();return false;'><i class='fa fa-info'></i></button> Sent #stResult.count# #application.stCOAPI[stResult.typename].displayname# records to CloudSearch. <pre class='formatjson' style='display:none;'>#fullDetail#</pre>" />
 </ft:processform>
 
+
+<ft:processform action="Index All Records">
+	<cfset stContent = application.fapi.getContentObject(form.selectedobjectid,"csContentType") />
+	<cfset contentURL = "#application.url.webroot#/webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyUploadTypeEverything&CONTENTTYPE=#stContent.CONTENTTYPE#">
+	<skin:onReady>
+		<cfoutput>
+			$fc.objectAdminAction('AWS CloudSearch', '#contentURL#');
+		</cfoutput>
+	</skin:onReady>		
+</ft:processForm>
+
+
 <cfset aCustomColumns = [
 	"contentType",
 	"builtToDate",
@@ -53,7 +65,7 @@
 	SortableColumns=""
 	lFilterFields=""
 	sqlorderby="contentType asc"
-	lCustomActions="Index Next 10 Records"
+	lCustomActions="Index Next 10 Records,Index All Records"
 	r_oTypeAdmin="oTypeAdmin">
 
 	<cfset stAttributes = oTypeAdmin.getAttributes()>
