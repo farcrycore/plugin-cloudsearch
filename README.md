@@ -62,4 +62,8 @@ We didn't get time for some features, but would like to have them included at so
 - file document content (such as PDF, DOC, etc)
 
 
+### Cloudsearch - Reindex everything
 
+In Farcry webtop, when in 'Content Type Indexes', there is an option to 'Index all records' for each Content Type. If a new record for that content is added during the indexing, it sets 'build to date' to now, and only records after that timestamp will be index, which means older records will not be indexed.
+
+To index **everything** run this script: /webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyUploadAuto

@@ -3,7 +3,7 @@ http://yaffa-env-adnews.192.168.99.101.nip.io/webtop/index.cfm?typename=csConten
  --->
 <cfsetting enablecfoutputonly="true" requesttimeout="10000">
 
-	<cfoutput><h1>AWS CloudSearch :: bulkImportIntoCloudSearch()</h1></cfoutput><cfflush interval="1">
+	<cfoutput><h1>AWS CloudSearch :: bulkImportIntoCloudSearch()</h1></cfoutput>
 
 	<cfparam name="URL.skip"    default="">
 	<cfparam name="URL.maxRows" default="50">
@@ -20,7 +20,7 @@ http://yaffa-env-adnews.192.168.99.101.nip.io/webtop/index.cfm?typename=csConten
 			<cfif ListLen(URL.skip) == 0 OR ListFind(URL.skip, stContentType.CONTENTTYPE) == 0>
 				<cfset stResult = bulkImportIntoCloudSearch(objectid=qTypes.objectid, maxRows=URL.maxRows) />
 				
-				<cfoutput><p>#stResult.typename#: #stResult.count#</p></cfoutput><cfflush interval="1">
+				<cfoutput><p>#stResult.typename#: #stResult.count#</p></cfoutput>
 				<!--- <cfdump var="#stResult#" label=" #qTypes.contentType# 100"> --->
 				<cfif stResult.count GT 0>
 					<cfset more = true>
@@ -38,7 +38,7 @@ http://yaffa-env-adnews.192.168.99.101.nip.io/webtop/index.cfm?typename=csConten
 	<cftry>
 		<cfif more>
 			<cfoutput>
-				<cfoutput><h4>More to process ...</h4><p>#Now()#</p></cfoutput><cfflush>
+				<cfoutput><h4>More to process ...</h4><p>#Now()#</p></cfoutput>
 				
 			
 				
