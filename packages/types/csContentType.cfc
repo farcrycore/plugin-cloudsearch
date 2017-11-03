@@ -600,11 +600,6 @@
 
 		</cfloop>
 
-		<!--- if no publishdate, set  to datetimecreated --->	
-		<cfif NOT structKeyExists(stResult,'publishdate_date')>
-			<cfset stResult['publishdate_date'] = processDate(arguments.stObject, 'datetimecreated') />
-		</cfif>
-
 		<cfreturn stResult />
 	</cffunction>
 
