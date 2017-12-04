@@ -33,7 +33,7 @@
 		<cfargument name="stObject" type="struct" required="true" hint="The object" />
 		
 		<cfset application.fc.lib.cloudsearch.resolveIndexFieldDifferences() />
-		<cfset application.fc.lib.cloudsearch.updateTypeIndexFieldCache(typename=arguments.stProperties.typename) />
+		<cfset application.fc.lib.cloudsearch.updateTypeIndexFieldCache(typename=arguments.typename) />
 
 		<cfset super.onDelete(argumentCollection = arguments) />
 	</cffunction>
@@ -311,18 +311,39 @@
 
 		<cfset var qResult = "" />
 
-		<cfquery datasource="#application.dsn#" name="qResult">
-			select 	p.fieldName as property, concat(lower(p.fieldName),'_',replace(p.fieldType,'-','_')) as field, p.fieldType as `type`, p.weight, p.bSort as `sort`, p.bFacet as `facet`,
-					'' as default_value, 0 as `return`, 1 as `search`, 0 as highlight, case when p.fieldType in ('text','text-array') then '_en_default_' else '' end as analysis_scheme
-			from 	csContentType ct
-					inner join
-					csContentType_aProperties p
-					on ct.objectid=p.parentid
-			where 	p.bIndex=1
-					<cfif structKeyExists(arguments,"typename")>
-						and ct.contentType = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.typename#">
-					</cfif>
-		</cfquery>
+			<cfswitch expression="#application.dbtype#">
+				<cfcase value="mssql,mssql2005,mssql2012">
+					<cfquery datasource="#application.dsn#" name="qResult">
+						select 	p.fieldName as property, 
+			            lower(p.fieldName) + '_'+ replace(p.fieldType,'-','_') as field, 
+			            p.fieldType as 'type', p.weight, p.bSort as 'sort', p.bFacet as 'facet',
+								'' as default_value, 0 as 'return', 1 as 'search', 0 as highlight, case when p.fieldType in ('text','text-array') then '_en_default_' else '' end as analysis_scheme
+						from 	csContentType ct
+								inner join
+								csContentType_aProperties p
+								on ct.objectid=p.parentid
+						where 	p.bIndex=1
+						<cfif structKeyExists(arguments,"typename")>
+							and ct.contentType = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.typename#">
+						</cfif>
+					</cfquery>
+				</cfcase>
+
+				<cfdefaultcase>
+					<cfquery datasource="#application.dsn#" name="qResult">
+						select 	p.fieldName as property, concat(lower(p.fieldName),'_',replace(p.fieldType,'-','_')) as field, p.fieldType as `type`, p.weight, p.bSort as `sort`, p.bFacet as `facet`,
+								'' as default_value, 0 as `return`, 1 as `search`, 0 as highlight, case when p.fieldType in ('text','text-array') then '_en_default_' else '' end as analysis_scheme
+						from 	csContentType ct
+								inner join
+								csContentType_aProperties p
+								on ct.objectid=p.parentid
+						where 	p.bIndex=1
+						<cfif structKeyExists(arguments,"typename")>
+							and ct.contentType = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.typename#">
+						</cfif>
+					</cfquery>		
+				</cfdefaultcase>
+			</cfswitch>
 
 		<cfif qResult.recordcount>
 			<cfset queryAddRow(qResult) />
