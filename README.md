@@ -69,3 +69,8 @@ In Farcry webtop, when in 'Content Type Indexes', there is an option to 'Index a
 To index all records for a given type, run this script: 
 /webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyUploadTypeEverything&CONTENTTYPE=dspArticle
 
+
+### Cloudsearch - Export / Import
+/webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyIndexExport
+/webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyIndexImport
+

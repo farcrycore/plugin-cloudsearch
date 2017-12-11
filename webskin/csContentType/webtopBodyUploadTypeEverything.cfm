@@ -9,11 +9,24 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 
 	<cfparam name="URL.skip"        default="">
 	<cfparam name="URL.maxRows"     default="100">
-	<cfparam name="URL.CONTENTTYPE" default="dspArticle">
+	<cfparam name="URL.CONTENTTYPE" default="">
 	<cfparam name="URL.start"       default="true">
 	
 	<cfset requestSize = "5000000" />
+
+<cfif URL.CONTENTTYPE == "">
+	<cfset qTypes = application.fapi.getContentObjects(typename="csContentType",lProperties="objectid,contentType,builtToDate",orderby="builtToDate asc") />
+	<cfoutput>
+		<h1>Index Updae - select Content Type</h1>
 	
+		
+		<ul>
+		<cfloop query="qTypes">
+			<li><a href="/webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyUploadTypeEverything&CONTENTTYPE=#qTypes.CONTENTTYPE#">#qTypes.CONTENTTYPE#</a></li>
+		</cfloop>
+		</ul>
+	</cfoutput>
+<cfelse>
 	<cfoutput><h1>Index all '#URL.CONTENTTYPE#' records</h1></cfoutput>
 		
 	<cfparam name="APPLICATION.webtopBodyUploadTypeEverything" default="#StructNew()#">
@@ -94,11 +107,17 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 				</cfoutput>
 				
 			<cfelse>
-				<cfoutput><h4>All Done</h4></cfoutput>
+				<cfoutput>
+					<h4>All Done</h4>
+					<p><a href="/webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyUploadTypeEverything">back</a></p>
+				</cfoutput>
 			</cfif>
 	
 		<cfelse>
-			<cfoutput><p>nothing to process</p></cfoutput>
+			<cfoutput>
+				<p>nothing to process</p>
+				<p><a href="/webtop/index.cfm?typename=csContentType&view=webtopPageModal&bodyView=webtopBodyUploadTypeEverything">back</a></p>
+			</cfoutput>
 		</cfif>
 		<cfcatch>
 			<cfdump var="#recordCount#" label="AJM recordCount" expand="Yes" abort="No"  />
@@ -107,7 +126,7 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 		</cfcatch>
 	</cftry>
 	
-
+</cfif>
 	
 <cfsetting enablecfoutputonly="false">
 
