@@ -17,7 +17,7 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 <cfif URL.CONTENTTYPE == "">
 	<cfset qTypes = application.fapi.getContentObjects(typename="csContentType",lProperties="objectid,contentType,builtToDate",orderby="builtToDate asc") />
 	<cfoutput>
-		<h1>Index Updae - select Content Type</h1>
+		<h1>Index Update - select Content Type</h1>
 	
 		
 		<ul>
