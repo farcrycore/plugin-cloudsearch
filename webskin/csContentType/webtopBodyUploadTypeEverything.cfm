@@ -5,7 +5,7 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
  --->
 <cfsetting enablecfoutputonly="true" requesttimeout="10000">
 
-	
+<!--- @@cacheStatus: -1 --->
 
 	<cfparam name="URL.skip"        default="">
 	<cfparam name="URL.maxRows"     default="100">
