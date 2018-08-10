@@ -343,6 +343,9 @@ component {
 		if (not structKeyExists(arguments,"domain") or not len(arguments.domain)){
 			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
 		}
+		
+		// strip invalid charactures
+		arguments.documents = XMLHighSafe(arguments.documents);
 
 		// create temporary file for streaming into the SDK
 		application.fc.lib.cdn.ioWriteFile(location="temp",file="/cloudsearch/documents-#id#.json",data=arguments.documents);
@@ -1229,6 +1232,22 @@ component {
 		}
 
 		return aLogs2;
+	}
+
+
+	private string function XMLHighSafe(required string text){
+		// https://devtidbits.com/2008/03/11/remove-or-clean-high-extended-ascii-characters-in-coldfusion-for-xml-safeness/
+		var i = 0;
+		var tmp = '';
+		while(ReFind('[^\x00-\x7F]',text,i,false))
+		{
+		    i = ReFind('[^\x00-\x7F]',text,i,false); // discover high chr and save it's numeric string position.
+		    tmp = '&##x#FormatBaseN(Asc(Mid(text,i,1)),16)#;'; // obtain the high chr and convert it to a hex numeric chr.
+		    text = Insert(tmp,text,i); // insert the new hex numeric chr into the string.
+		    text = RemoveChars(text,i,1); // delete the redundant high chr from string.
+		    i = i+Len(tmp); // adjust the loop scan for the new chr placement, then continue the loop.
+		}
+		return text;
 	}
 
 }
