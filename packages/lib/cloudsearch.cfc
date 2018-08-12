@@ -345,7 +345,9 @@ component {
 		}
 		
 		// strip invalid charactures
-		arguments.documents = XMLHighSafeRemove(arguments.documents);
+//arguments.documents = XMLHighSafeRemove(arguments.documents);
+arguments.documents = ESAPIEncode('xml', arguments.documents);
+
 
 		// create temporary file for streaming into the SDK
 		application.fc.lib.cdn.ioWriteFile(location="temp",file="/cloudsearch/documents-#id#.json",data=arguments.documents);
@@ -1263,6 +1265,23 @@ component {
 		    text = RemoveChars(text,i,1); // delete the redundant high chr from string.
 		    i = i+Len(tmp); // adjust the loop scan for the new chr placement, then continue the loop.
 		}
+		
+		// vertical Tab ^K
+		// https://en.wikipedia.org/wiki/Control_character
+		
+		/* if (find(chr(0), text)) {
+			writeLog(file="cloudsearch",text="Found Null - stripped out");
+			text = replace(text,chr(0),'', 'all');
+		} */
+		if (find(chr(9), text)) {
+			writeLog(file="cloudsearch",text="Found Horizontal Tab - stripped out");
+			text = replace(text,chr(9),'', 'all');
+		}
+		if (find(chr(11), text)) {
+			writeLog(file="cloudsearch",text="Found Vertical Tab - stripped out");
+			text = replace(text,chr(11),'', 'all');
+		}
+		
 		return text;
 	}
 

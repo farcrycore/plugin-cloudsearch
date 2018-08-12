@@ -120,8 +120,8 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 			</cfoutput>
 		</cfif>
 		<cfcatch>
-			<cfdump var="#recordCount#" label="AJM recordCount" expand="Yes" abort="No"  />
-			<cfdump var="#ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])#" label="AJM ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])" expand="Yes" abort="No"  />
+			<cfdump var="#recordCount#" label="recordCount" expand="Yes" abort="No"  />
+			<cfdump var="#ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])#" label="ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])" expand="Yes" abort="No"  />
 			<cfdump var="#cfcatch#" label="cfcatch" abort="true">
 		</cfcatch>
 	</cftry>
