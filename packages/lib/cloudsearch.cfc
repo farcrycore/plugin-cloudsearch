@@ -346,7 +346,7 @@ component {
 		
 		// strip invalid charactures
 //arguments.documents = XMLHighSafeRemove(arguments.documents);
-arguments.documents = ESAPIEncode('xml', arguments.documents);
+arguments.documents = sanitizeString(arguments.documents);
 
 
 		// create temporary file for streaming into the SDK
