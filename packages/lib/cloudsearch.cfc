@@ -345,9 +345,7 @@ component {
 		}
 		
 		// strip invalid charactures
-//arguments.documents = XMLHighSafeRemove(arguments.documents);
-arguments.documents = sanitizeString(arguments.documents);
-
+		arguments.documents = RemoveExtraInvalidChars(arguments.documents);
 
 		// create temporary file for streaming into the SDK
 		application.fc.lib.cdn.ioWriteFile(location="temp",file="/cloudsearch/documents-#id#.json",data=arguments.documents);
@@ -1237,7 +1235,7 @@ arguments.documents = sanitizeString(arguments.documents);
 	}
 
 
-	private string function XMLHighSafe(required string text){
+	private string function XMLHighSafe(required string text) {
 		// https://devtidbits.com/2008/03/11/remove-or-clean-high-extended-ascii-characters-in-coldfusion-for-xml-safeness/
 		var i = 0;
 		var tmp = '';
@@ -1252,7 +1250,7 @@ arguments.documents = sanitizeString(arguments.documents);
 		return text;
 	}
 	
-	private string function XMLHighSafeRemove(required string text){
+	private string function XMLHighSafeRemove(required string text) {
 		// https://devtidbits.com/2008/03/11/remove-or-clean-high-extended-ascii-characters-in-coldfusion-for-xml-safeness/
 		var i = 0;
 		var tmp = '';
@@ -1265,24 +1263,13 @@ arguments.documents = sanitizeString(arguments.documents);
 		    text = RemoveChars(text,i,1); // delete the redundant high chr from string.
 		    i = i+Len(tmp); // adjust the loop scan for the new chr placement, then continue the loop.
 		}
-		
-		// vertical Tab ^K
-		// https://en.wikipedia.org/wiki/Control_character
-		
-		/* if (find(chr(0), text)) {
-			writeLog(file="cloudsearch",text="Found Null - stripped out");
-			text = replace(text,chr(0),'', 'all');
-		} */
-		if (find(chr(9), text)) {
-			writeLog(file="cloudsearch",text="Found Horizontal Tab - stripped out");
-			text = replace(text,chr(9),'', 'all');
-		}
-		if (find(chr(11), text)) {
-			writeLog(file="cloudsearch",text="Found Vertical Tab - stripped out");
-			text = replace(text,chr(11),'', 'all');
-		}
-		
-		return text;
 	}
 
+	private string function RemoveExtraInvalidChars(required string text) {
+		if (find('\u000b', ARGUMENTS.text)) {
+			writeLog(file="cloudsearch",text="\u000b - stripped out");
+			text = replace(ARGUMENTS.text,'\u000b','', 'all');
+		}
+		return text;
+	}
 }
