@@ -1078,6 +1078,24 @@ Thanks!
         </cfif>
     </cffunction>
 
+    <cffunction name="lpusharray" access="public" returntype="numeric" output="no">
+        <cfargument name="key" type="string" required="yes" />
+        <cfargument name="strings" type="array" required="yes" />
+
+        <cfset var connection = '' />
+        <cfset var result = '' />
+
+        <cfset connection = getResource() />
+        <cfset result = connection.lpush(JavaCast("string", arguments.key), arguments.strings) />
+        <cfset returnResource(connection) />
+
+        <cfif isDefined("result")>
+            <cfreturn result />
+        <cfelse>
+            <cfreturn 0 />
+        </cfif>
+    </cffunction>
+
 
     <!--- FIXME: Change to use format Long lpushx(final String key, final String... string) --->
     <!--- LPUSHX - Long lpushx(String key, String string) --->
