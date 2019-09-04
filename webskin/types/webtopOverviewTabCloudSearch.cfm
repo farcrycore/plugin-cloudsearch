@@ -35,51 +35,59 @@
 	</style>
 </cfoutput></skin:htmlHead>
 
-<cfset stDoc = application.fapi.getContentType("csContentType").getCloudsearchDocument(stObject=stObj) />
-<cfset jsonOut = application.fapi.formatJSON(serializeJSON(stDoc)) />
-<ft:field label="Document"><cfoutput>
-	<pre class="formatjson">#jsonOut#</pre>
-	<p><a href='#application.fapi.getLink(type="csContentType", view="ajaxPush", urlParameters="pushtype=#stObj.typename#&pushID=#stObj.objectid#")#' onclick="$j(this).find('.info').remove().end().prepend('<i class=\'fa fa-spinner fa-spin info\'></i> '); $j.ajax({ url:this.href, dataType:'json', success:function(data){ $j(this).find('.fa').remove().end().append(' <span class=\'info\' style=\'text-decoration:none;cursor:default;'+(data.success ? 'color:green;' : 'color:red;')+'\'>'+data.message+'</span>'); }, context:this }); return false;">Push update to CloudSearch</a></p>
-</cfoutput></ft:field>
+<cfset qSearchTypes = application.fc.lib.cloudsearch.getAllContentTypes()>
+<cfif listFind(valueList(qSearchTypes.contentType), stObj.typename)>
 
-<cfset stResult = application.fc.lib.cloudsearch.search(typename=stObj.typename,conditions=[{ "property"="objectid", "term"=stObj.objectid }]) />
-<cfoutput><h2>Object ID Search</h2></cfoutput>
-<ft:field label="Query"><cfoutput><pre>#stResult.rawQuery#</pre></cfoutput></ft:field>
-<ft:field label="Filter"><cfoutput><pre>#stResult.rawFilter#</pre></cfoutput></ft:field>
-<ft:field label="Records found"><cfoutput>#stResult.items.recordcount#</cfoutput></ft:field>
+	<cfset stDoc = application.fapi.getContentType("csContentType").getCloudsearchDocument(stObject=stObj) />
+	<cfset jsonOut = application.fapi.formatJSON(serializeJSON(stDoc)) />
+	<ft:field label="Document"><cfoutput>
+		<pre class="formatjson">#jsonOut#</pre>
+		<p><a href='#application.fapi.getLink(type="csContentType", view="ajaxPush", urlParameters="pushtype=#stObj.typename#&pushID=#stObj.objectid#")#' onclick="$j(this).find('.info').remove().end().prepend('<i class=\'fa fa-spinner fa-spin info\'></i> '); $j.ajax({ url:this.href, dataType:'json', success:function(data){ $j(this).find('.fa').remove().end().append(' <span class=\'info\' style=\'text-decoration:none;cursor:default;'+(data.success ? 'color:green;' : 'color:red;')+'\'>'+data.message+'</span>'); }, context:this }); return false;">Push update to CloudSearch</a></p>
+	</cfoutput></ft:field>
 
-<cfset stResult = application.fc.lib.cloudsearch.search(rawQuery=stObj.label) />
-<cfoutput><h2>Label Search</h2></cfoutput>
-<ft:field label="Query"><cfoutput><pre>#stResult.rawQuery#</pre></cfoutput></ft:field>
-<ft:field label="Filter"><cfoutput><pre>#stResult.rawFilter#</pre></cfoutput></ft:field>
-<ft:field label="Results"><cfoutput>
-	<table class="table table-striped">
-		<thead>
-			<tr>
-				<th>Object ID</th>
-				<th>Typename</th>
-				<th>Label</th>
-				<th></th>
-			</tr>
-		</thead>
-		<tbody>
-			<cfloop query="stResult.items">
-				<cfset stObject = application.fapi.getContentObject(typename=stResult.items.typename,objectid=stResult.items.objectid) />
+	<cfset stResult = application.fc.lib.cloudsearch.search(typename=stObj.typename,conditions=[{ "property"="objectid", "term"=stObj.objectid }]) />
+	<cfoutput><h2>Object ID Search</h2></cfoutput>
+	<ft:field label="Query"><cfoutput><pre>#stResult.rawQuery#</pre></cfoutput></ft:field>
+	<ft:field label="Filter"><cfoutput><pre>#stResult.rawFilter#</pre></cfoutput></ft:field>
+	<ft:field label="Records found"><cfoutput>#stResult.items.recordcount#</cfoutput></ft:field>
 
+	<cfset stResult = application.fc.lib.cloudsearch.search(rawQuery=stObj.label) />
+	<cfoutput><h2>Label Search</h2></cfoutput>
+	<ft:field label="Query"><cfoutput><pre>#stResult.rawQuery#</pre></cfoutput></ft:field>
+	<ft:field label="Filter"><cfoutput><pre>#stResult.rawFilter#</pre></cfoutput></ft:field>
+	<ft:field label="Results"><cfoutput>
+		<table class="table table-striped">
+			<thead>
 				<tr>
-					<td>#stResult.items.objectid#</td>
-					<td>#stResult.items.typename#</td>
-					<td>#stObject.label#</td>
-					<td><a title="#application.stCOAPI[stResult.items.typename].displayname# Overview" onclick="$fc.objectAdminAction('Media Overview', this.href, { onHidden : function(){} }); return false;" href="#application.url.webtop#/edittabOverview.cfm?typename=#stResult.items.typename#&method=edit&ref=iframe&objectid=#stResult.items.objectid#&dialogID=fcModal">Overview</a></td>
+					<th>Object ID</th>
+					<th>Typename</th>
+					<th>Label</th>
+					<th></th>
 				</tr>
-			</cfloop>
-			<cfif stResult.items.recordcount eq 0>
-				<tr>
-					<td colspan="2">No items returned</td>
-				</tr>
-			</cfif>
-		</tbody>
-	</table>
-</cfoutput></ft:field>
+			</thead>
+			<tbody>
+				<cfloop query="stResult.items">
+					<cfset stObject = application.fapi.getContentObject(typename=stResult.items.typename,objectid=stResult.items.objectid) />
+
+					<tr>
+						<td>#stResult.items.objectid#</td>
+						<td>#stResult.items.typename#</td>
+						<td>#stObject.label#</td>
+						<td><a title="#application.stCOAPI[stResult.items.typename].displayname# Overview" onclick="$fc.objectAdminAction('Media Overview', this.href, { onHidden : function(){} }); return false;" href="#application.url.webtop#/edittabOverview.cfm?typename=#stResult.items.typename#&method=edit&ref=iframe&objectid=#stResult.items.objectid#&dialogID=fcModal">Overview</a></td>
+					</tr>
+				</cfloop>
+				<cfif stResult.items.recordcount eq 0>
+					<tr>
+						<td colspan="2">No items returned</td>
+					</tr>
+				</cfif>
+			</tbody>
+		</table>
+	</cfoutput></ft:field>
+
+<cfelse>
+	<cfoutput>This content type is not indexed in CloudSearch</cfoutput>
+</cfif>
+
 
 <cfsetting enablecfoutputonly="false" />
