@@ -458,6 +458,7 @@
 		<cfset var qContent = "" />
 		<cfset var oContent = "" />
 		<cfset var stObject = "" />
+		<cfset var stContentObject = "" />
 		<cfset var stContent = {} />
 		<cfset var strOut = createObject("java","java.lang.StringBuffer").init() />
 		<cfset var builtToDate = "" />
@@ -476,9 +477,9 @@
 
 		<cfloop query="qContent">
 
-			<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(stObject=stObject))>
-				<cfset stObject = oContent.getData(objectid=qContent.objectid) />
-				<cfset stContent = getCloudsearchDocument(stObject=stObject) />
+			<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(objectid=qContent.objectid))>
+				<cfset stContentObject = oContent.getData(objectid=qContent.objectid) />
+				<cfset stContent = getCloudsearchDocument(stObject=stContentObject) />
 				
 				<cfset strOut.append('{"type":"add","id":"') />
 				<cfset strOut.append(qContent.objectid) />
