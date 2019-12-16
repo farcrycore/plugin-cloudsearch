@@ -475,15 +475,7 @@
 
 		<cfset strOut.append("[") />
 
-		<cfset var bFirstDocumentFound = false >
-		<cfset var bAppend = false >
-
 		<cfloop query="qContent">
-			<cfif bAppend AND bFirstDocumentFound>
-				<cfset strOut.append(",") />
-			</cfif>
-
-			<cfset bAppend = false >
 			<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(objectid=qContent.objectid))>
 				<cfset stContentObject = oContent.getData(objectid=qContent.objectid) />
 				<cfset stContent = getCloudsearchDocument(stObject=stContentObject) />
@@ -493,14 +485,12 @@
 				<cfset strOut.append('","fields":') />
 				<cfset strOut.append(serializeJSON(stContent)) />
 				<cfset strOut.append('}') />
-				<cfset bAppend = true >
-				<cfset bFirstDocumentFound = true >
+				<cfset strOut.append(",") />
 			<cfelseif qContent.operation eq "deleted">
 				<cfset strOut.append('{"type":"delete","id":"') />
 				<cfset strOut.append(qContent.objectid) />
 				<cfset strOut.append('"}') />
-				<cfset bAppend = true >
-				<cfset bFirstDocumentFound = true >
+				<cfset strOut.append(",") />
 			</cfif>
 
 			<cfif strOut.length() * ((qContent.currentrow+1) / qContent.currentrow) gt arguments.requestSize or qContent.currentrow eq qContent.recordcount>
