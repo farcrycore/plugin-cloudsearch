@@ -496,6 +496,11 @@
 			<cfif strOut.length() * ((qContent.currentrow+1) / qContent.currentrow) gt arguments.requestSize or qContent.currentrow eq qContent.recordcount>
 				<cfset builtToDate = qContent.datetimeLastUpdated />
 				<cfset count = qContent.currentrow />
+
+				<!--- remove last comma --->
+				<cfif strOut.charAt(strOut.length() - 1) eq ",">
+					<cfset strOut.setLength(strOut.length() - 1)>
+				</cfif>
 				<cfbreak />
 			</cfif>
 		</cfloop>

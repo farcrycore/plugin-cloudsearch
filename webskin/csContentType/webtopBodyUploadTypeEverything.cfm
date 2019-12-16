@@ -81,6 +81,10 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 	
 				<cfif strOut.length() * ((qContent.currentrow+1) / qContent.currentrow) gt requestSize or qContent.currentrow eq qContent.recordcount>
 					<cfset count = qContent.currentrow />
+					<!--- remove last comma --->
+					<cfif strOut.charAt(strOut.length() - 1) eq ",">
+						<cfset strOut.setLength(strOut.length() - 1)>
+					</cfif>
 					<cfbreak />
 				</cfif>
 
