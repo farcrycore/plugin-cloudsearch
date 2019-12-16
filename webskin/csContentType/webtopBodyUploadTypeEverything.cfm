@@ -61,7 +61,7 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 			<cfloop query="qContent">
 				<!--- remove from application scope --->
 				<cfset APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE] = ListDeleteAt(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE], 1)>
-
+				<cfset bAppend = false >
 				<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(objectid=qContent.objectid))>
 					<cfset stContentObject = oContent.getData(objectid=qContent.objectid) />
 					<cfset stContent = getCloudsearchDocument(stObject=stContentObject) />
@@ -71,17 +71,21 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 					<cfset strOut.append('","fields":') />
 					<cfset strOut.append(serializeJSON(stContent)) />
 					<cfset strOut.append('}') />
+					<cfset bAppend = true >
 				<cfelseif qContent.operation eq "deleted">
 					<cfset strOut.append('{"type":"delete","id":"') />
 					<cfset strOut.append(qContent.objectid) />
 					<cfset strOut.append('"}') />
+					<cfset bAppend = true >
 				</cfif>
 	
 				<cfif strOut.length() * ((qContent.currentrow+1) / qContent.currentrow) gt requestSize or qContent.currentrow eq qContent.recordcount>
 					<cfset count = qContent.currentrow />
 					<cfbreak />
 				<cfelse>
-					<cfset strOut.append(",") />
+					<cfif bAppend>
+						<cfset strOut.append(",") />
+					</cfif>
 				</cfif>
 
 			</cfloop>
