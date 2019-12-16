@@ -58,7 +58,14 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 			<cfset qContent = getRecordsToUpdate(URL.CONTENTTYPE, contentIDs)>
 			
 			<cfset strOut.append("[") />
+
+			<cfset bFirstDocumentFound = false >
+			<cfset bAppend = false >
+
 			<cfloop query="qContent">
+				<cfif bAppend AND bFirstDocumentFound>
+					<cfset strOut.append(",") />
+				</cfif>
 				<!--- remove from application scope --->
 				<cfset APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE] = ListDeleteAt(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE], 1)>
 				<cfset bAppend = false >
@@ -72,20 +79,18 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 					<cfset strOut.append(serializeJSON(stContent)) />
 					<cfset strOut.append('}') />
 					<cfset bAppend = true >
+					<cfset bFirstDocumentFound = true >
 				<cfelseif qContent.operation eq "deleted">
 					<cfset strOut.append('{"type":"delete","id":"') />
 					<cfset strOut.append(qContent.objectid) />
 					<cfset strOut.append('"}') />
 					<cfset bAppend = true >
+					<cfset bFirstDocumentFound = true >
 				</cfif>
 	
 				<cfif strOut.length() * ((qContent.currentrow+1) / qContent.currentrow) gt requestSize or qContent.currentrow eq qContent.recordcount>
 					<cfset count = qContent.currentrow />
 					<cfbreak />
-				<cfelse>
-					<cfif bAppend>
-						<cfset strOut.append(",") />
-					</cfif>
 				</cfif>
 
 			</cfloop>
