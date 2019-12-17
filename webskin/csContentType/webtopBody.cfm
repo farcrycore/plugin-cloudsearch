@@ -65,7 +65,7 @@
 	SortableColumns=""
 	lFilterFields=""
 	sqlorderby="contentType asc"
-	lCustomActions="Index Next 10 Records,Index All Records"
+	lCustomActions="Index Next 500 Records,Index All Records"
 	r_oTypeAdmin="oTypeAdmin">
 
 	<cfset stAttributes = oTypeAdmin.getAttributes()>
