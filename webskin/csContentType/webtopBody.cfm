@@ -3,8 +3,8 @@
 <cfimport taglib="/farcry/core/tags/formtools" prefix="ft" />
 <cfimport taglib="/farcry/core/tags/webskin" prefix="skin" />
 
-<ft:processform action="Index Next 10 Records">
-	<cfset stResult = bulkImportIntoCloudSearch(objectid=form.selectedObjectID, maxRows=10) />
+<ft:processform action="Index Next 500 Records">
+	<cfset stResult = bulkImportIntoCloudSearch(objectid=form.selectedObjectID, maxRows=500) />
 	<cfset fullDetail = application.fapi.formatJSON(serializeJSON(stResult)) />
 
 	<skin:loadJS id="formatjson" />
