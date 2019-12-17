@@ -479,13 +479,14 @@
 		<cfset var bAppend = false >
 
 		<cfloop query="qContent">
-			<cfset bAppend = false >
+			
 			<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(objectid=qContent.objectid))>
 				<cfset stContentObject = oContent.getData(objectid=qContent.objectid) />
 				<cfset stContent = getCloudsearchDocument(stObject=stContentObject) />
 				
 				<cfif bAppend AND bFirstDocumentFound>
 					<cfset strOut.append(",") />
+					<cfset bAppend = false >
 				</cfif>
 
 				<cfset strOut.append('{"type":"add","id":"') />
@@ -499,6 +500,7 @@
 
 				<cfif bAppend AND bFirstDocumentFound>
 					<cfset strOut.append(",") />
+					<cfset bAppend = false >
 				</cfif>
 
 				<cfset strOut.append('{"type":"delete","id":"') />
