@@ -561,7 +561,12 @@
 		
 		<cfset strOut.append("[") />
 
-		<cfif arguments.operation eq "updated">
+		<cfset var operation = arguments.operation>
+		<cfif arguments.operation eq "updated" and (structKeyExists(oContent, "isIndexable") AND NOT oContent.isIndexable(objectid=arguments.stObject.objectid))>
+			<cfset operation = "deleted">
+		</cfif>
+
+		<cfif operation eq "updated">
 			<cfset stContent = getCloudsearchDocument(stObject=arguments.stObject) />
 			
 			<cfset strOut.append('{"type":"add","id":"') />
@@ -570,7 +575,7 @@
 			<cfset strOut.append(serializeJSON(stContent)) />
 			<cfset strOut.append('}') />
 			<cfset builtToDate = arguments.stObject.datetimeLastUpdated />
-		<cfelseif arguments.operation eq "deleted">
+		<cfelseif operation eq "deleted">
 			<cfset strOut.append('{"type":"delete","id":"') />
 			<cfset strOut.append(arguments.stObject.objectid) />
 			<cfset strOut.append('"}') />
