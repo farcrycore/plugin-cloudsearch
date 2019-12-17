@@ -475,32 +475,45 @@
 
 		<cfset strOut.append("[") />
 
+		<cfset var bFirstDocumentFound = false >
+		<cfset var bAppend = false >
+
 		<cfloop query="qContent">
+			<cfset bAppend = false >
 			<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(objectid=qContent.objectid))>
 				<cfset stContentObject = oContent.getData(objectid=qContent.objectid) />
 				<cfset stContent = getCloudsearchDocument(stObject=stContentObject) />
 				
+				<cfif bAppend AND bFirstDocumentFound>
+					<cfset strOut.append(",") />
+				</cfif>
+
 				<cfset strOut.append('{"type":"add","id":"') />
 				<cfset strOut.append(qContent.objectid) />
 				<cfset strOut.append('","fields":') />
 				<cfset strOut.append(serializeJSON(stContent)) />
 				<cfset strOut.append('}') />
-				<cfset strOut.append(",") />
+				<cfset bAppend = true >
+				<cfset bFirstDocumentFound = true >
 			<cfelseif qContent.operation eq "deleted">
+
+				<cfif bAppend AND bFirstDocumentFound>
+					<cfset strOut.append(",") />
+				</cfif>
+
 				<cfset strOut.append('{"type":"delete","id":"') />
 				<cfset strOut.append(qContent.objectid) />
 				<cfset strOut.append('"}') />
-				<cfset strOut.append(",") />
+				<cfset bAppend = true >
+				<cfset bFirstDocumentFound = true >
+			</cfif>
+
+			<cfif bAppend>
+				<cfset count++>
 			</cfif>
 
 			<cfif strOut.length() * ((qContent.currentrow+1) / qContent.currentrow) gt arguments.requestSize or qContent.currentrow eq qContent.recordcount>
 				<cfset builtToDate = qContent.datetimeLastUpdated />
-				<cfset count = qContent.currentrow />
-
-				<!--- remove last comma --->
-				<cfif strOut.charAt(strOut.length() - 1) eq ",">
-					<cfset strOut.setLength(strOut.length() - 1)>
-				</cfif>
 				<cfbreak />
 			</cfif>
 		</cfloop>
@@ -509,10 +522,11 @@
 
 		<cfif count>
 			<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
-			<cfset arguments.stObject.builtToDate = builtToDate />
-			<cfset setData(stProperties=arguments.stObject) />
-			<cflog file="cloudsearch" text="Updated #count# #arguments.stObject.contentType# record/s" />
 		</cfif>
+
+		<cfset arguments.stObject.builtToDate = builtToDate />
+		<cfset setData(stProperties=arguments.stObject) />
+		<cflog file="cloudsearch" text="Updated #count# #arguments.stObject.contentType# record/s" />
 
 		<cfset stResult["typename"] = arguments.stObject.contentType />
 		<cfset stResult["count"] = count />

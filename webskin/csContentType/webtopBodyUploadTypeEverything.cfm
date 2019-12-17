@@ -42,6 +42,7 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 		</cfif>
 		
 		<cfset recordCount = ListLen(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE])>
+        <cfdump var="#recordCount#">
 		<cfset more =  recordCount GT 0>
 	
 		<cfif more>
@@ -59,36 +60,51 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 			
 			<cfset strOut.append("[") />
 
+			<cfset bFirstDocumentFound = false >
+			<cfset bAppend = false >
+
 			<cfloop query="qContent">
 				<!--- remove from application scope --->
 				<cfset APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE] = ListDeleteAt(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE], 1)>
+				<cfset bAppend = false >
 				<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(objectid=qContent.objectid))>
 					<cfset stContentObject = oContent.getData(objectid=qContent.objectid) />
 					<cfset stContent = getCloudsearchDocument(stObject=stContentObject) />
 					
+					<cfif bAppend AND bFirstDocumentFound>
+						<cfset strOut.append(",") />
+					</cfif>
+
 					<cfset strOut.append('{"type":"add","id":"') />
 					<cfset strOut.append(qContent.objectid) />
 					<cfset strOut.append('","fields":') />
 					<cfset strOut.append(serializeJSON(stContent)) />
 					<cfset strOut.append('}') />
-					<cfset strOut.append(",") />
+					<cfset bAppend = true >
+					<cfset bFirstDocumentFound = true >
 				<cfelseif qContent.operation eq "deleted">
+
+					<cfif bAppend AND bFirstDocumentFound>
+						<cfset strOut.append(",") />
+					</cfif>
+
 					<cfset strOut.append('{"type":"delete","id":"') />
 					<cfset strOut.append(qContent.objectid) />
 					<cfset strOut.append('"}') />
-					<cfset strOut.append(",") />
+					<cfset bAppend = true >
+					<cfset bFirstDocumentFound = true >
+				</cfif>
+
+				<cfif bAppend>
+					<cfset count++>
 				</cfif>
 	
 				<cfif strOut.length() * ((qContent.currentrow+1) / qContent.currentrow) gt requestSize or qContent.currentrow eq qContent.recordcount>
-					<cfset count = qContent.currentrow />
-					<!--- remove last comma --->
-					<cfif strOut.charAt(strOut.length() - 1) eq ",">
-						<cfset strOut.setLength(strOut.length() - 1)>
-					</cfif>
 					<cfbreak />
 				</cfif>
 
 			</cfloop>
+
 			<cfset strOut.append("]") />
 					
 			<cfif count>
