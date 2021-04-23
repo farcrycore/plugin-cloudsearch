@@ -22,7 +22,7 @@ Base features include:
 - Register the plugin in the projects constructor; ./www/farcryConstructor.cfm
 - Restart your application
 - Open the "Cloudsearch" config and fill in the details of your service account
-
+- This plugin requires that the AWS Java SDK 1.11 jars and Jedis 2.8.1 (and their dependancies) be in the Java path
 
 ### AWS Cloudsearch
 

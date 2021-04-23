@@ -96,11 +96,11 @@ Thanks!
         <cfset jedisPoolConfig.setTestOnBorrow(JavaCast("boolean", false)) />
         <cfset jedisPoolConfig.setTestOnReturn(JavaCast("boolean", false)) />
         <cfset jedisPoolConfig.setTestWhileIdle(JavaCast("boolean", true)) />
-        <cfset jedisPoolConfig.setMaxActive(JavaCast("int", 100)) />
+        <cfset jedisPoolConfig.setMaxTotal(JavaCast("int", 100)) />
         <cfset jedisPoolConfig.setMaxIdle(JavaCast("int", 5)) />
         <cfset jedisPoolConfig.setNumTestsPerEvictionRun(JavaCast("int", 10)) />
         <cfset jedisPoolConfig.setTimeBetweenEvictionRunsMillis(JavaCast("int", 10000)) />
-        <cfset jedisPoolConfig.setMaxWait(JavaCast("int", 3000)) />
+        <cfset jedisPoolConfig.setMaxWaitMillis(JavaCast("int", 3000)) />
 
         <cfset jedisPool = CreateObject("java", "redis.clients.jedis.JedisPool") />
         <cfset jedisPool.init(jedisPoolConfig, arguments.host, arguments.port) />

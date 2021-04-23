@@ -149,8 +149,10 @@ component {
 
 			regions = createobject("java","com.amazonaws.regions.Regions");
 			region = createobject("java","com.amazonaws.regions.Region");
-			writeLog(file="cloudsearch",text="Setting region to [#region.getRegion(regions.fromName(regionname)).getName()#]");
-			tmpClient.setRegion(region.getRegion(regions.fromName(regionname)));
+			var regionEnum = regions.fromName(regionname);
+			var regionObj = region.getRegion(regionEnum);
+			writeLog(file="cloudsearch",text="Setting region to [#regionObj.getName()#]");
+			tmpClient.setRegion(regionObj);
 
 			this.client = tmpClient;
 		}
@@ -544,6 +546,8 @@ component {
 		stResult["recordcount"] = hits.getFound();
 		stResult["page"] = arguments.page;
 		stResult["maxrows"] = arguments.maxrows;
+		stResult["startRow"] = (stResult.page - 1) * stResult.maxrows + 1;
+		stResult["endRow"] = min(stResult.page * stResult.maxrows, stResult.recordcount);
 
 		for (hit in hits.getHit()){
 			queryAddRow(stResult.items);

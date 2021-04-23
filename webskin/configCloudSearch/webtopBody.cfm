@@ -25,6 +25,26 @@
 	<cfset qIndexFields = application.fc.lib.cloudsearch.getIndexFields() />
 	<cfset qDiffIndexFields = application.fc.lib.cloudsearch.diffIndexFields() />
 
+	<cfif structKeyExists(url, "processingupdate")>
+		<cfset aResult = []>
+
+		<cfloop query="qDomains">
+			<cfset arrayAppend(aResult, {
+				"domain" = qDomains.domain,
+				"processing" = qDomains.processing
+			})>
+		</cfloop>
+
+		<cfloop query="qIndexFields">
+			<cfset arrayAppend(aResult, {
+				"field" = qIndexFields.field,
+				"state" = qIndexFields.state
+			})>
+		</cfloop>
+
+		<cfset application.fapi.stream(content=aResult, type="json")>
+	</cfif>
+
 	<cfoutput>
 		<h2>Search Domains</h2>
 		<table class="table table-striped">
@@ -46,10 +66,10 @@
 				</cfif>
 
 				<cfloop query="qDomains">
-					<tr>
+					<tr id="domain-info-#qDomains.domain#">
 						<td>#qDomains.domain#</td>
 						<td>#yesnoformat(qDomains.created)#</td>
-						<td>#yesnoformat(qDomains.processing)#</td>
+						<td class="processing updatable">#yesnoformat(qDomains.processing)#</td>
 						<td>#yesnoformat(qDomains.requires_index)#</td>
 						<td>#yesnoformat(qDomains.deleted)#</td>
 						<td>#qDomains.instance_count#</td>
@@ -84,7 +104,7 @@
 				</cfif>
 				
 				<cfloop query="qIndexFields">
-					<tr>
+					<tr id="field-info-#qIndexFields.field#">
 						<td>#qIndexFields.field#</td>
 						<td>#qIndexFields.type#</td>
 						<td>#qIndexFields.default_value#</td>
@@ -95,7 +115,7 @@
 						<td>#yesNoFormat(qIndexFields.highlight)#</td>
 						<td>#qIndexFields.analysis_scheme#</td>
 						<td>#yesNoFormat(qIndexFields.pending_deletion)#</td>
-						<td>#qIndexFields.state#</td>
+						<td class="state updatable">#qIndexFields.state#</td>
 					</tr>
 				</cfloop>
 			</tbody>
@@ -144,117 +164,191 @@
 					</cfloop>
 				</tbody>
 			</table>
-			<div id="cloudsearch-update-results"></div>
+		</cfif>
 
-			<script type="text/javascript">
-				function ajaxAction(url, confirmText, alertFn, htmlFn){
+		<style>
+			.updatable {
+				-webkit-transition: text-shadow 0.5s linear;
+				-moz-transition: text-shadow 0.5s linear;
+				-ms-transition: text-shadow 0.5s linear;
+				-o-transition: text-shadow 0.5s linear;
+				transition: text-shadow 0.5s linear;
+			}
+			.updatable.updated {
+				text-shadow: 0 0 10px black;
+			}
+			.updatable.updated-yes {
+				text-shadow: 0 0 10px green;
+			}
+			.updatable.updated-no {
+				text-shadow: 0 0 10px red;
+			}
+		</style>
+		<script type="text/javascript">
+			function ajaxAction(url, confirmText, alertFn, htmlFn){
 
-					if (confirmText && confirmText.length && !window.confirm(confirmText)){
-						return;
-					}
+				if (confirmText && confirmText.length && !window.confirm(confirmText)){
+					return;
+				}
 
-					$j.ajax({
-						type : "GET",
-						dataType : "json",
-						url : url, 
-						success : function(data){
+				$j.ajax({
+					type : "GET",
+					dataType : "json",
+					url : url, 
+					success : function(data){
+						if (data.errors.length){
+							for (var i=0; i<data.errors.length; i++){
+								alertFn("error", data.errors[i].message);
+							}
+						}
+
+						if (data.message.length){
+							alertFn("info", data.message);
+						}
+
+						if (data.html.length){
+							htmlFn(data.html);
+						}
+					},
+					error : function(jqXHR, textStatus, errorThrown){
+						var fallback = true, data = {};
+
+						try {
+							data = JSON.parse(jqXHR.responseText);
 							if (data.errors.length){
 								for (var i=0; i<data.errors.length; i++){
 									alertFn("error", data.errors[i].message);
 								}
+								fallback = false;
 							}
-
-							if (data.message.length){
-								alertFn("info", data.message);
+							else if (data.error){
+								alertFn("error", data.error.message);
+								fallback = false;
 							}
+						}
+						catch(e){}
 
-							if (data.html.length){
-								htmlFn(data.html);
+						if (fallback){
+							if (jqXHR.status === 403) {
+								alertFn("error", "Access Forbidden - your session may have timed out");
 							}
-						},
-						error : function(jqXHR, textStatus, errorThrown){
-							var fallback = true, data = {};
+							else {
+								alertFn("error", errorThrown);
+							}
+						}
+					}
+				});
+			}
 
-							try {
-								data = JSON.parse(jqXHR.responseText);
-								if (data.errors.length){
-									for (var i=0; i<data.errors.length; i++){
-										alertFn("error", data.errors[i].message);
-									}
-									fallback = false;
+			$j(document).on("click",".cloudsearch-domain-action", function(e){
+				var self = $j(this);
+
+				e.preventDefault();
+				e.stopPropagation();
+
+				function showAlert(status, message){
+					$j("##cloudsearch-domain-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
+				}
+				function showHTML(html){
+					showAlert("info",html);
+				}
+
+				ajaxAction(this.href, self.data("confirm"), showAlert, showHTML);
+
+				regularProcessingCheck();
+			});
+
+			$j(document).on("click",".cloudsearch-field-action", function(e){
+				var self = $j(this), tr = self.closest("tr");
+
+				e.preventDefault();
+				e.stopPropagation();
+
+				self.closest("td").html("...");
+
+				function showAlert(status, message){
+					$j("##cloudsearch-update-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
+				}
+				function showHTML(html){
+					tr.replaceWith(html);
+				}
+
+				ajaxAction(this.href, '', showAlert, showHTML);
+			});
+
+			$j("##cloudsearch-apply-all").on("click", function(e){
+				var self = $j(this), tbody = self.closest("tbody");
+
+				e.preventDefault();
+				e.stopPropagation();
+
+				tbody.find(".cloudsearch-field-action").closest("td").html("...");
+
+				function showAlert(status, message){
+					$j("##cloudsearch-update-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
+				}
+				function showHTML(html){
+					tbody.html(html);
+				}
+
+				ajaxAction(this.href, '', showAlert, showHTML);
+			});
+
+			function regularProcessingCheck() {
+				var checkProcessing = setInterval(function() {
+					$j.getJSON("#application.fapi.fixURL(addValues='processingupdate=1')#", function(data) {
+						var processing = false;
+
+						for (var i=0; i<data.length; i++) {
+							if (data[i].domain !== undefined) {
+								var n = data[i].processing ? "Yes" : "No";
+
+								if ($j("##domain-info-" + data[i].domain + " .processing").html() === n && n === "No") {
+									// do nothing
 								}
-								else if (data.error){
-									alertFn("error", data.error.message);
-									fallback = false;
+								else if ($j("##domain-info-" + data[i].domain + " .processing").html() === n) {
+									$j("##domain-info-" + data[i].domain + " .processing").addClass("updated");
 								}
-							}
-							catch(e){}
+								else if (data[i].processing) {
+									$j("##domain-info-" + data[i].domain + " .processing").addClass("updated-yes").html(n);
+								}
+								else  {
+									$j("##domain-info-" + data[i].domain + " .processing").addClass("updated-no").html(n);
+								}
 
-							if (fallback){
-								if (jqXHR.status === 403) {
-									alertFn("error", "Access Forbidden - your session may have timed out");
+								processing = processing || data[i].processing;
+							}
+							if (data[i].field !== undefined) {
+								if ($j("##field-info-" + data[i].field + " .state").html() === data[i].state && data[i].state === "Active") {
+									// do nothing
 								}
-								else {
-									alertFn("error", errorThrown);
+								else if ($j("##field-info-" + data[i].field + " .state").html() === data[i].state) {
+									$j("##field-info-" + data[i].field + " .state").addClass("updated");
+								}
+								else if (data[i].state === "Processing") {
+									$j("##field-info-" + data[i].field + " .state").addClass("updated-no").html(data[i].state);
+								}
+								else  {
+									$j("##field-info-" + data[i].field + " .state").addClass("updated-yes").html(data[i].state);
 								}
 							}
 						}
+
+						if (!processing) {
+							clearInterval(checkProcessing);
+						}
+
+						setTimeout(function() {
+							$j(".updated, .updated-yes, .updated-no").removeClass("updated updated-no updated-yes");
+						}, 1000);
 					});
-				}
+				}, 5000);
+			}
 
-				$j(document).on("click",".cloudsearch-domain-action", function(e){
-					var self = $j(this);
-
-					e.preventDefault();
-					e.stopPropagation();
-
-					function showAlert(status, message){
-						$j("##cloudsearch-domain-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
-					}
-					function showHTML(html){
-						showAlert("info",html);
-					}
-
-					ajaxAction(this.href, self.data("confirm"), showAlert, showHTML);
-				});
-
-				$j(document).on("click",".cloudsearch-field-action", function(e){
-					var self = $j(this), tr = self.closest("tr");
-
-					e.preventDefault();
-					e.stopPropagation();
-
-					self.closest("td").html("...");
-
-					function showAlert(status, message){
-						$j("##cloudsearch-update-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
-					}
-					function showHTML(html){
-						tr.replaceWith(html);
-					}
-
-					ajaxAction(this.href, '', showAlert, showHTML);
-				});
-
-				$j("##cloudsearch-apply-all").on("click", function(e){
-					var self = $j(this), tbody = self.closest("tbody");
-
-					e.preventDefault();
-					e.stopPropagation();
-
-					tbody.find(".cloudsearch-field-action").closest("td").html("...");
-
-					function showAlert(status, message){
-						$j("##cloudsearch-update-results").append("<div class='alert alert-"+status+"'><button class='close' data-dismiss='alert' type='button'>×</button>"+message+"</div>");
-					}
-					function showHTML(html){
-						tbody.html(html);
-					}
-
-					ajaxAction(this.href, '', showAlert, showHTML);
-				});
-			</script>
-		</cfif>
+			<cfif listFind(valueList(qDomains.processing), "true")>
+				regularProcessingCheck();
+			</cfif>
+		</script>
 	</cfoutput>
 </cfif>
 
