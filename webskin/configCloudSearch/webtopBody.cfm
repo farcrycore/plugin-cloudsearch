@@ -1,4 +1,20 @@
-<cfsetting enablecfoutputonly="true">
+<cfsetting enablecfoutputonly="true" requesttimeout="100000">
+
+<cfimport taglib="/farcry/core/tags/webskin" prefix="skin">
+<cfimport taglib="/farcry/core/tags/formtools" prefix="ft">
+
+<cfif structKeyExists(url, "cleardomain")>
+	<cfset total = application.fc.lib.cloudsearch.clearDocuments(application.fapi.getConfig("cloudsearch","domain")) />
+	<skin:bubble message="Cleared #total# documents from #application.fapi.getConfig("cloudsearch","domain")#" />
+	<skin:location url="#application.fapi.fixURL(removevalues='cleardomain')#" />
+</cfif>
+
+<cfif structKeyExists(url, "reuploaddomain")>
+	<cfset stResult = application.fc.lib.cloudsearch.reuploadAllDocuments() />
+	<skin:bubble message="Cleared #stResult.clear.count# documents (#stResult.clear.time#) from #stResult.domain#" />
+	<skin:bubble message="Reuploaded #stResult.reupload.count# documents (#stResult.reupload.time#) to #stResult.domain#" />
+	<skin:location url="#application.fapi.fixURL(removevalues='reuploaddomain')#" />
+</cfif>
 
 <cfoutput>
 	<h1>CloudSearch Status</h1>
@@ -47,6 +63,13 @@
 
 	<cfoutput>
 		<h2>Search Domains</h2>
+
+		<ft:buttonPanel>
+			<a class="btn" onClick="return window.confirm('Are you sure you want to remove all the documents to #application.fapi.getConfig("cloudsearch","domain")# and reupload them?')" href="#application.fapi.fixURL(addValues='reuploaddomain=1')#">Reupload All</a>
+			<a class="btn" onClick="return window.confirm('Are you sure you want to remove all the documents in #application.fapi.getConfig("cloudsearch","domain")#?')" href="#application.fapi.fixURL(addValues='cleardomain=1')#">Clear</a>
+			<a class="btn cloudsearch-domain-action" data-confirm="Are you sure you want to re-index #application.fapi.getConfig("cloudsearch","domain")#?" href="#application.fapi.getLink(type='configCloudSearch',view='webtopAjaxIndexDocuments',urlParameters='domain=#application.fapi.getConfig("cloudsearch","domain")#')#">Index</a>
+		</ft:buttonPanel>
+
 		<table class="table table-striped">
 			<thead>
 				<tr>
@@ -57,7 +80,6 @@
 					<th>Deleted</th>
 					<th>Instance Count</th>
 					<th>Instance Type</th>
-					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -74,7 +96,6 @@
 						<td>#yesnoformat(qDomains.deleted)#</td>
 						<td>#qDomains.instance_count#</td>
 						<td>#qDomains.instance_type#</td>
-						<td><a class="cloudsearch-domain-action" data-confirm="Are you sure you want to re-index #qDomains.domain#?" href="#application.fapi.getLink(type='configCloudSearch',view='webtopAjaxIndexDocuments',urlParameters='domain=#qDomains.domain#')#">Index</a>
 					</tr>
 				</cfloop>
 			</tbody>

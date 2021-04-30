@@ -455,23 +455,23 @@
 		<cfargument name="maxRows" type="numeric" required="false" default="-1" />
 		<cfargument name="requestSize" type="numeric" required="false" default="5000000" />
 
-		<cfset var qContent = "" />
-		<cfset var oContent = "" />
-		<cfset var stObject = "" />
 		<cfset var stContentObject = "" />
 		<cfset var stContent = {} />
 		<cfset var strOut = createObject("java","java.lang.StringBuffer").init() />
-		<cfset var builtToDate = "" />
 		<cfset var stResult = {} />
-		<cfset var count = 0 />
 
 		<cfif not structKeyExists(arguments,"stObject")>
 			<cfset arguments.stObject = getData(objectid=arguments.objectid) />
 		</cfif>
 
-		<cfset oContent = application.fapi.getContentType(typename=arguments.stObject.contentType) />
-		<cfset qContent = getRecordsToUpdate(typename=arguments.stObject.contentType,builtToDate=arguments.stObject.builtToDate,maxRows=arguments.maxRows) />
-		<cfset builtToDate = arguments.stObject.builtToDate />
+		<cfset var oContent = application.fapi.getContentType(typename=arguments.stObject.contentType) />
+		<cfset var qContent = getRecordsToUpdate(typename=arguments.stObject.contentType,builtToDate=arguments.stObject.builtToDate,maxRows=arguments.maxRows) />
+		<cfset var stReturn = {
+			"typename" = arguments.stObject.contentType,
+			"count" = 0,
+			"builtToDate" = arguments.stObject.builtToDate
+		} />
+
 
 		<cfset strOut.append("[") />
 
@@ -479,7 +479,6 @@
 		<cfset var bAppend = false >
 
 		<cfloop query="qContent">
-
 			<cfset var operation = qContent.operation>
 			<cfif qContent.operation eq "updated" and (structKeyExists(oContent, "isIndexable") AND NOT oContent.isIndexable(objectid=qContent.objectid))>
 				<cfset operation = "deleted">
@@ -516,30 +515,22 @@
 			</cfif>
 
 			<cfif bAppend>
-				<cfset count++>
+				<cfset stReturn.count++>
 			</cfif>
 
 			<cfif strOut.length() * ((qContent.currentrow+1) / qContent.currentrow) gt arguments.requestSize or qContent.currentrow eq qContent.recordcount>
-				<cfset builtToDate = qContent.datetimeLastUpdated />
-				<cfbreak />
+				<cfset strOut.append("]") />
+				<cfset stReturn.builtToDate = qContent.datetimeLastUpdated />
+				<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
+				<cfset strOut = createObject("java","java.lang.StringBuffer").init() />
 			</cfif>
 		</cfloop>
 
-		<cfset strOut.append("]") />
-
-		<cfif count>
-			<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
-		</cfif>
-
-		<cfset arguments.stObject.builtToDate = builtToDate />
+		<cfset arguments.stObject.builtToDate = stReturn.builtToDate />
 		<cfset setData(stProperties=arguments.stObject) />
-		<cflog file="cloudsearch" text="Updated #count# #arguments.stObject.contentType# record/s" />
+		<cflog file="cloudsearch" text="Updated #stReturn.count# #arguments.stObject.contentType# record/s" />
 
-		<cfset stResult["typename"] = arguments.stObject.contentType />
-		<cfset stResult["count"] = count />
-		<cfset stResult["builtToDate"] = builtToDate />
-
-		<cfreturn stResult />
+		<cfreturn stReturn />
 	</cffunction>
 
 	<cffunction name="importIntoCloudSearch" access="public" output="false" returntype="struct">

@@ -177,6 +177,48 @@ component {
 		}
 	}
 
+	public struct function reuploadAllDocuments() {
+		var domain = application.fapi.getConfig("cloudsearch","domain","");
+
+		var stReturn = {
+			"domain" = domain,
+			"clear": {
+				"start": 0,
+				"time": 0,
+				"count": 0
+			},
+			"reupload": {
+				"start": 0,
+				"time": 0,
+				"count": 0
+			}
+		};
+		var stResult = {};
+
+		// clear documents
+		stReturn.clear.start = getTickCount();
+		stReturn.clear.count = clearDocuments(domain);
+
+		// reupload documents
+		stReturn.reupload.start = getTickCount();
+		stReturn.clear.time = numberFormat((stReturn.reupload.start - stReturn.clear.start) / 1000, "0.0") & "s";
+
+		var qCT = application.fapi.getContentObjects(typename="csContentType");
+		var oCT = application.fapi.getContentType(typename="csContentType");
+		var stCT = {};
+
+		for (var row in qCT) {
+			stCT = oCT.getData(objectid=qCT.objectid);
+			stCT.builtToDate = createDate(1970, 1, 1);
+			stResult = oCT.bulkImportIntoCloudSearch(stObject=stCT);
+			stReturn.reupload.count += stResult.count;
+		}
+
+		stReturn.reupload.time = numberFormat((getTickCount() - stReturn.reupload.start) / 1000, "0.0") & "s";
+
+		return stReturn;
+	}
+
 	/* CloudSearch API Wrappers */
 	public query function getDomains(){
 		var csClient = getClient();
@@ -307,6 +349,41 @@ component {
 		querySetCell(arguments.qResult,"state",indexStatus.getState());
 
 		return arguments.qResult;
+	}
+
+	public numeric function clearDocuments(string domain){
+		var pageSize = 10000;
+		var result = { recordcount=1 };
+		var strOut = "";
+		var row = {};
+		var total = 0;
+
+		while (result.recordcount) {
+			strOut = createObject("java","java.lang.StringBuffer").init();
+			result = search(domain=arguments.domain, maxrows=pageSize);
+
+			if (result.items.recordcount) {
+				strOut.append("[");
+
+				for (row in result.items) {
+					if (result.items.currentrow gt 1) {
+						strOut.append(",");
+					}
+
+					strOut.append('{"type":"delete","id":"');
+					strOut.append(row.objectid);
+					strOut.append('"}');
+				}
+
+				strOut.append("]");
+
+				uploadDocuments(domain=arguments.domain, documents=strOut.toString());
+
+				total += result.items.recordcount;
+			}
+		}
+
+		return total;
 	}
 
 	public array function indexDocuments(string domain){
