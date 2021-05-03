@@ -10,10 +10,35 @@
 </cfif>
 
 <cfif structKeyExists(url, "reuploaddomain")>
-	<cfset stResult = application.fc.lib.cloudsearch.reuploadAllDocuments() />
-	<skin:bubble message="Cleared #stResult.clear.count# documents (#stResult.clear.time#) from #stResult.domain#" />
-	<skin:bubble message="Reuploaded #stResult.reupload.count# documents (#stResult.reupload.time#) to #stResult.domain#" />
-	<skin:location url="#application.fapi.fixURL(removevalues='reuploaddomain')#" />
+	<cfthread>
+		<cfset application.fc.lib.cloudsearch.reuploadAllDocuments() />
+	</cfthread>
+	<cfsleep time="1000">
+
+	<skin:location url="#application.fapi.fixURL(addvalues='showreuploadstatus=1', removevalues='reuploaddomain')#" />
+</cfif>
+
+<cfif structKeyExists(url, "showreuploadstatus")>
+	<cfset stResult = application.fc.lib.cloudsearch.getReuploadAllDocumentsStatus() />
+	<cfswitch expression="#stResult.status#">
+		<cfcase value="queued">
+			<skin:bubble message="#stResult.status_detail#" />
+		</cfcase>
+
+		<cfcase value="clearing">
+			<skin:bubble message="#stResult.status_detail#" />
+		</cfcase>
+
+		<cfcase value="reuploading">
+			<skin:bubble message="Cleared #stResult.clear.count# documents (#stResult.clear.time#) from #stResult.domain#" />
+			<skin:bubble message="#stResult.status_detail#" />
+		</cfcase>
+
+		<cfcase value="done">
+			<skin:bubble message="Cleared #stResult.clear.count# documents (#stResult.clear.time#) from #stResult.domain#" />
+			<skin:bubble message="Reuploaded #stResult.reupload.count# documents (#stResult.reupload.time#) to #stResult.domain#" />
+		</cfcase>
+	</cfswitch>
 </cfif>
 
 <cfoutput>

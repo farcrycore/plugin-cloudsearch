@@ -177,10 +177,20 @@ component {
 		}
 	}
 
+	public struct function getReuploadAllDocumentsStatus() {
+		if (structKeyExists(this, "reloadingStatus")) {
+			return this.reloadingStatus;
+		}
+
+		return { "status":"none" };
+	}
+
 	public struct function reuploadAllDocuments() {
 		var domain = application.fapi.getConfig("cloudsearch","domain","");
 
-		var stReturn = {
+		this.reloadingStatus = {
+			"status" = "queued",
+			"status_detail" = "Reupload queued",
 			"domain" = domain,
 			"clear": {
 				"start": 0,
@@ -196,12 +206,16 @@ component {
 		var stResult = {};
 
 		// clear documents
-		stReturn.clear.start = getTickCount();
-		stReturn.clear.count = clearDocuments(domain);
+		this.reloadingStatus.status = "clearing";
+		this.reloadingStatus.status_detail = "Clearing documents";
+		this.reloadingStatus.clear.start = getTickCount();
+		this.reloadingStatus.clear.count = clearDocuments(domain);
 
 		// reupload documents
-		stReturn.reupload.start = getTickCount();
-		stReturn.clear.time = numberFormat((stReturn.reupload.start - stReturn.clear.start) / 1000, "0.0") & "s";
+		this.reloadingStatus.status = "reuploading";
+		this.reloadingStatus.status_detail = "Getting types to reupload";
+		this.reloadingStatus.reupload.start = getTickCount();
+		this.reloadingStatus.clear.time = numberFormat((this.reloadingStatus.reupload.start - this.reloadingStatus.clear.start) / 1000, "0.0") & "s";
 
 		var qCT = application.fapi.getContentObjects(typename="csContentType");
 		var oCT = application.fapi.getContentType(typename="csContentType");
@@ -210,13 +224,16 @@ component {
 		for (var row in qCT) {
 			stCT = oCT.getData(objectid=qCT.objectid);
 			stCT.builtToDate = createDate(1970, 1, 1);
+			this.reloadingStatus.status_detail = "Reuploading #stCT.contentType# (#this.reloadingStatus.reupload.count# complete)";
 			stResult = oCT.bulkImportIntoCloudSearch(stObject=stCT);
-			stReturn.reupload.count += stResult.count;
+			this.reloadingStatus.reupload.count += stResult.count;
 		}
 
-		stReturn.reupload.time = numberFormat((getTickCount() - stReturn.reupload.start) / 1000, "0.0") & "s";
+		this.reloadingStatus.reupload.time = numberFormat((getTickCount() - this.reloadingStatus.reupload.start) / 1000, "0.0") & "s";
 
-		return stReturn;
+		this.reloadingStatus.status = "done";
+
+		return this.reloadingStatus;
 	}
 
 	/* CloudSearch API Wrappers */
