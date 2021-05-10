@@ -557,6 +557,8 @@
 			<cfset operation = "deleted">
 		</cfif>
 
+		<cfset arguments.stObject.typename = listLast(application.stCOAPI[arguments.stObject.typename].fullname, '.') />
+
 		<cfif operation eq "updated">
 			<cfset stContent = getCloudsearchDocument(stObject=arguments.stObject) />
 			
