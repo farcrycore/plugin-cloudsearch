@@ -872,6 +872,9 @@ component {
 			else if (structKeyExists(item,"text")) {
 				arrayAppend(arrOut,getTextSearchQuery(stIndexFields=arguments.stIndexFields, text=item.text, bBoost=arguments.bBoost, indent=arguments.indent));
 			}
+			else if (structKeyExists(item,"prefix")) {
+				arrayAppend(arrOut,getPrefixSearchQuery(stIndexFields=arguments.stIndexFields, prefix=item.prefix, bBoost=arguments.bBoost, indent=arguments.indent));
+			}
 			else if (structKeyExists(item,"and")) {
 				if (arraylen(item["and"]) gt 1){
 					arrayAppend(arrOut,repeatstring(" ",arguments.indent) & "(and " & chr(10) & getSearchQueryFromArray(stIndexFields=arguments.stIndexFields, conditions=item["and"], bBoost=arguments.bBoost, indent=indent+1).query & chr(10) & repeatstring(" ",arguments.indent) & ")");
@@ -981,6 +984,25 @@ component {
 				}
 
 				arrayAppend(aSubQuery,repeatstring(" ",arguments.indent+1) & "(or field='#arguments.stIndexFields[key].field#'#boost# #textStr#)");
+			}
+		}
+
+		return repeatstring(" ",arguments.indent) & "(or " & chr(10) & arraytolist(aSubQuery,chr(10)) & repeatstring(" ",arguments.indent) & ")";
+	}
+
+	private string function getPrefixSearchQuery(required struct stIndexFields, required string prefix, boolean bBoost=true, numeric indent=1){
+		var aSubQuery = [];
+		var key = "";
+		var textStr = getTextValue(arguments.prefix);
+		var boost = "";
+
+		for (key in arguments.stIndexFields){
+			if (listfindnocase("text,text-array",arguments.stIndexFields[key].type)) {
+				if (arguments.bBoost){
+					boost = " boost=#arguments.stIndexFields[key].weight#";
+				}
+
+				arrayAppend(aSubQuery,repeatstring(" ",arguments.indent+1) & "(prefix field='#arguments.stIndexFields[key].field#'#boost# #textStr#)");
 			}
 		}
 
