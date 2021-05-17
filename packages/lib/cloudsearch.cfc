@@ -993,7 +993,8 @@ component {
 	private string function getPrefixSearchQuery(required struct stIndexFields, required string prefix, boolean bBoost=true, numeric indent=1){
 		var aSubQuery = [];
 		var key = "";
-		var textStr = getTextValue(arguments.prefix);
+		var terms = listToArray(arguments.prefix, " ");
+		var term = "";
 		var boost = "";
 
 		for (key in arguments.stIndexFields){
@@ -1002,7 +1003,9 @@ component {
 					boost = " boost=#arguments.stIndexFields[key].weight#";
 				}
 
-				arrayAppend(aSubQuery,repeatstring(" ",arguments.indent+1) & "(prefix field='#arguments.stIndexFields[key].field#'#boost# #textStr#)");
+				for (term in terms) {
+					arrayAppend(aSubQuery,repeatstring(" ",arguments.indent+1) & "(prefix field='#arguments.stIndexFields[key].field#'#boost# #getTextValue(term)#)");
+				}
 			}
 		}
 
