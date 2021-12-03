@@ -188,50 +188,70 @@ component {
 	public struct function reuploadAllDocuments() {
 		var domain = application.fapi.getConfig("cloudsearch","domain","");
 
-		this.reloadingStatus = {
-			"status" = "queued",
-			"status_detail" = "Reupload queued",
-			"domain" = domain,
-			"clear": {
-				"start": 0,
-				"time": 0,
-				"count": 0
-			},
-			"reupload": {
-				"start": 0,
-				"time": 0,
-				"count": 0
+		try {
+			this.reloadingStatus = {
+				"status" = "queued",
+				"status_detail" = "Reupload queued",
+				"domain" = domain,
+				"clear": {
+					"start": 0,
+					"time": 0,
+					"count": 0
+				},
+				"reupload": {
+					"start": 0,
+					"time": 0,
+					"count": 0
+				}
+			};
+			var stResult = {};
+
+			// clear documents
+			this.reloadingStatus.status = "clearing";
+			this.reloadingStatus.status_detail = "Clearing documents";
+			this.reloadingStatus.clear.start = getTickCount();
+			this.reloadingStatus.clear.count = clearDocuments(domain);
+
+			// reupload documents
+			this.reloadingStatus.status = "reuploading";
+			this.reloadingStatus.status_detail = "Getting types to reupload";
+			this.reloadingStatus.reupload.start = getTickCount();
+			this.reloadingStatus.clear.time = numberFormat((this.reloadingStatus.reupload.start - this.reloadingStatus.clear.start) / 1000, "0.0") & "s";
+
+			var qCT = application.fapi.getContentObjects(typename="csContentType");
+			var oCT = application.fapi.getContentType(typename="csContentType");
+			var stCT = {};
+			var k = "";
+
+			for (var row in qCT) {
+				stCT = oCT.getData(objectid=qCT.objectid);
+
+				this.reloadingStatus.status_detail = "Querying for #stCT.contentType# content to push";
+				var qData = oCT.getRecordsToUpdate(typename=stCT.contentType, includeDeletions=false);
+
+				if (qData.recordcount) {
+					this.reloadingStatus.status_detail = "Reuploading #stCT.contentType#";
+
+					var stResult = { nextRow = 1 };
+					while (stResult.nextRow lte qData.recordcount) {
+						stResult = oCT.bulkImportIntoCloudSearchByQuery(qData=qData, fromRow=stResult.nextRow, maxRows=10);
+						this.reloadingStatus.reupload.count += stResult.count;
+						this.reloadingStatus.status_detail = "Reuploading #stCT.contentType# (#this.reloadingStatus.reupload.count#/#qData.recordcount#)";
+						this.reloadingStatus.reupload.time = numberFormat((getTickCount() - this.reloadingStatus.reupload.start) / 1000, "0.0") & "s";
+					}
+
+					stCT.builtToDate = qData.datetimeLastUpdated[qData.recordcount];
+					oCT.setData(stProperties=stCT);
+				}
 			}
-		};
-		var stResult = {};
 
-		// clear documents
-		this.reloadingStatus.status = "clearing";
-		this.reloadingStatus.status_detail = "Clearing documents";
-		this.reloadingStatus.clear.start = getTickCount();
-		this.reloadingStatus.clear.count = clearDocuments(domain);
-
-		// reupload documents
-		this.reloadingStatus.status = "reuploading";
-		this.reloadingStatus.status_detail = "Getting types to reupload";
-		this.reloadingStatus.reupload.start = getTickCount();
-		this.reloadingStatus.clear.time = numberFormat((this.reloadingStatus.reupload.start - this.reloadingStatus.clear.start) / 1000, "0.0") & "s";
-
-		var qCT = application.fapi.getContentObjects(typename="csContentType");
-		var oCT = application.fapi.getContentType(typename="csContentType");
-		var stCT = {};
-
-		for (var row in qCT) {
-			stCT = oCT.getData(objectid=qCT.objectid);
-			stCT.builtToDate = createDate(1970, 1, 1);
-			this.reloadingStatus.status_detail = "Reuploading #stCT.contentType# (#this.reloadingStatus.reupload.count# complete)";
-			stResult = oCT.bulkImportIntoCloudSearch(stObject=stCT);
-			this.reloadingStatus.reupload.count += stResult.count;
+			this.reloadingStatus.status = "done";
 		}
-
-		this.reloadingStatus.reupload.time = numberFormat((getTickCount() - this.reloadingStatus.reupload.start) / 1000, "0.0") & "s";
-
-		this.reloadingStatus.status = "done";
+		catch (err) {
+			this.reloadingStatus.status = "error";
+			this.reloadingStatus.status_detail = err.message;
+			this.reloadingStatus.error_detail = err;
+		}
 
 		return this.reloadingStatus;
 	}

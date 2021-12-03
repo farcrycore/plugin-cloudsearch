@@ -18,32 +18,62 @@
 	<skin:location url="#application.fapi.fixURL(addvalues='showreuploadstatus=1', removevalues='reuploaddomain')#" />
 </cfif>
 
-<cfif structKeyExists(url, "showreuploadstatus")>
+<cfif structKeyExists(url, "getreuploadstatus")>
 	<cfset stResult = application.fc.lib.cloudsearch.getReuploadAllDocumentsStatus() />
+
 	<cfswitch expression="#stResult.status#">
 		<cfcase value="queued">
-			<skin:bubble message="#stResult.status_detail#" />
+			<cfset application.fapi.stream(content={ "html"="<div class='alert alert-warning'>#stResult.status_detail#</div>", "done"=false }, type="json") />
 		</cfcase>
 
 		<cfcase value="clearing">
-			<skin:bubble message="#stResult.status_detail#" />
+			<cfset application.fapi.stream(content={ "html"="<div class='alert alert-warning'>#stResult.status_detail#</div>", "done"=false }, type="json") />
 		</cfcase>
 
 		<cfcase value="reuploading">
-			<skin:bubble message="Cleared #stResult.clear.count# documents (#stResult.clear.time#) from #stResult.domain#" />
-			<skin:bubble message="#stResult.status_detail#" />
+			<cfset application.fapi.stream(content={ "html"="<div class='alert alert-warning'>Cleared #stResult.clear.count# documents (#stResult.clear.time#) from #stResult.domain#<br>#stResult.status_detail# ... #stResult.reupload.time#s so far</div>", "done"=false }, type="json") />
+		</cfcase>
+
+		<cfcase value="error">
+			<cfset application.fapi.stream(content={ "html"="<div class='alert alert-danger'>Error: #stResult.status_detail#</div>", "done"=true }, type="json") />
 		</cfcase>
 
 		<cfcase value="done">
-			<skin:bubble message="Cleared #stResult.clear.count# documents (#stResult.clear.time#) from #stResult.domain#" />
-			<skin:bubble message="Reuploaded #stResult.reupload.count# documents (#stResult.reupload.time#) to #stResult.domain#" />
+			<cfset application.fapi.stream(content={ "html"="<div class='alert alert-success'>Cleared #stResult.clear.count# documents (#stResult.clear.time#) from #stResult.domain#<br>Reuploaded #stResult.reupload.count# documents (#stResult.reupload.time#) to #stResult.domain#</div>", "done"=true }, type="json") />
 		</cfcase>
 	</cfswitch>
 </cfif>
 
 <cfoutput>
 	<h1>CloudSearch Status</h1>
+</cfoutput>
 
+<cfif structKeyExists(url, "showreuploadstatus")>
+	<cfoutput>
+		<div id="uploadstatus"></div>
+		<script>
+			$j(function() {
+				var $status = $j("##uploadstatus");
+
+				function updateStatus() {
+					window.setTimeout(function() {
+						$j.getJSON("#application.fapi.fixURL(removevalues='showreuploadstatus')#&getreuploadstatus=1", function(data) {
+							$status.html(data.html);
+
+							if (!data.done) {
+								updateStatus();
+							}
+						});
+					}, 1000);
+				}
+
+				updateStatus();
+			});
+		</script>
+	</cfoutput>
+</cfif>
+
+<cfoutput>
 	<h2>Configuration</h2>
 	<table class="table table-striped">
 		<cfloop list="domain,region,accessID,accessSecret" index="thisfield">

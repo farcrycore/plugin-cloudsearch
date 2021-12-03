@@ -423,25 +423,33 @@
 		<cfargument name="typename" type="string" required="true" />
 		<cfargument name="builtToDate" type="string" required="false" />
 		<cfargument name="maxRows" type="numeric" required="false" default="-1" />
+		<cfargument name="includeDeletions" type="boolean" required="false" default="true" />
 
 		<cfset var qContent = "" />
+		<cfset var oContent = application.fapi.getContentType(arguments.typename) />
+		
+		<cfif structKeyExists(oContent, "getCloudsearchRecordsToUpdate")>
+			<cfreturn oContent.getCloudsearchRecordsToUpdate(argumentCollection=arguments) />
+		</cfif>
 
 		<cfquery datasource="#application.dsn#" name="qContent" maxrows="#arguments.maxrows#">
 			select 		objectid, datetimeLastUpdated, '#arguments.typename#' as typename, 'updated' as operation
 			from 		#application.dbowner##arguments.typename#
-			<cfif application.fapi.showFarcryDate(arguments.builtToDate)>
+			<cfif structKeyExists(arguments, "builtToDate") and application.fapi.showFarcryDate(arguments.builtToDate)>
 				where 	datetimeLastUpdated > <cfqueryparam cfsqltype="cf_sql_timestamp" value="#arguments.builtToDate#">
 			</cfif>
 
-			UNION
+			<cfif arguments.includeDeletions>
+				UNION
 
-			select 		archiveID as objectid, datetimeCreated as datetimeLastUpdated, '#arguments.typename#' as typename, 'deleted' as operation
-			from 		#application.dbowner#dmArchive
-			where 		objectTypename = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.typename#" />
-						and bDeleted = <cfqueryparam cfsqltype="cf_sql_bit" value="1" />
-						<cfif application.fapi.showFarcryDate(arguments.builtToDate)>
-							and datetimeLastUpdated > <cfqueryparam cfsqltype="cf_sql_timestamp" value="#arguments.builtToDate#">
-						</cfif>
+				select 		archiveID as objectid, datetimeCreated as datetimeLastUpdated, '#arguments.typename#' as typename, 'deleted' as operation
+				from 		#application.dbowner#dmArchive
+				where 		objectTypename = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.typename#" />
+							and bDeleted = <cfqueryparam cfsqltype="cf_sql_bit" value="1" />
+							<cfif structKeyExists(arguments, "builtToDate") and application.fapi.showFarcryDate(arguments.builtToDate)>
+								and datetimeLastUpdated > <cfqueryparam cfsqltype="cf_sql_timestamp" value="#arguments.builtToDate#">
+							</cfif>
+			</cfif>
 
 			order by 	datetimeLastUpdated asc
 		</cfquery>
@@ -533,6 +541,93 @@
 		<cfreturn stReturn />
 	</cffunction>
 
+	<cffunction name="estimateSizeAfterNextDocument" access="public" output="false" returntype="numeric">
+		<cfargument name="current" type="numeric" required="true" />
+		<cfargument name="startRow" type="numeric" required="true" />
+		<cfargument name="currentRow" type="numeric" required="true" />
+
+		<cfset var rowsSoFar = arguments.currentRow - arguments.startRow + 1 />
+		<cfset var ratio = (rowsSoFar + 1) / rowsSoFar />
+
+		<cfreturn arguments.current * ratio />
+	</cffunction>
+
+	<cffunction name="appendUpdateRow" access="public" output="false">
+		<cfargument name="out" type="any" required="true" />
+		<cfargument name="qData" type="query" required="true" />
+		<cfargument name="row" type="numeric" required="true" />
+		<cfargument name="stContentTypes" type="struct" required="true" />
+
+		<cfset var objectid = arguments.qData.objectid[arguments.row] />
+		<cfset var typename = arguments.qData.typename[arguments.row] />
+		<cfset var operation = arguments.qData.operation[arguments.row] />
+		
+		<cfif not structKeyExists(arguments.stContentTypes, typename)>
+			<cfset arguments.stContentTypes[typename] = application.fapi.getContentType(typename=typename) />
+		</cfif>
+		<cfset var oContent = arguments.stContentTypes[typename] />
+
+		<cfif operation eq "updated" and (structKeyExists(oContent, "isIndexable") AND NOT oContent.isIndexable(objectid=objectid))>
+			<cfset operation = "deleted">
+		</cfif>
+
+		<cfset var stContentObject = {} />
+		<cfset var stContent = {} />
+
+		<cfif operation eq "updated">
+			<cfset stContentObject = oContent.getData(objectid=objectid) />
+			<cfset stContent = getCloudsearchDocument(stObject=stContentObject) />
+
+			<cfset arguments.out.append('{"type":"add","id":"') />
+			<cfset arguments.out.append(objectid) />
+			<cfset arguments.out.append('","fields":') />
+			<cfset arguments.out.append(serializeJSON(stContent)) />
+			<cfset arguments.out.append('}') />
+		<cfelseif operation eq "deleted">
+			<cfset arguments.out.append('{"type":"delete","id":"') />
+			<cfset arguments.out.append(objectid) />
+			<cfset arguments.out.append('"}') />
+		</cfif>
+	</cffunction>
+
+	<cffunction name="bulkImportIntoCloudSearchByQuery" access="public" output="false" returntype="struct" hint="Note that this function does not update the builtToDate of the csContentType record">
+		<cfargument name="qData" type="query" required="true" hint="A query containing typename, objectid, and operation" />
+		<cfargument name="fromRow" type="numeric" required="false" default="1" hint="The row to start the import from" />
+		<cfargument name="requestSize" type="numeric" required="false" default="5000000" />
+		<cfargument name="maxrows" type="numeric" required="false" default="1000" />
+
+		<cfset var strOut = createObject("java","java.lang.StringBuffer").init() />
+		<cfset var currentindex = arguments.fromRow />
+		<cfset var stContentTypes = {} />
+		<cfset var stReturn = {
+			"count" = 0,
+			"builtToDate" = ""
+		} />
+
+		<cfset strOut.append("[") />
+
+		<cfloop condition="currentindex lte arguments.qData.recordcount and (currentindex - arguments.fromRow + 1) lte arguments.maxrows and estimateSizeAfterNextDocument(strOut.length(), arguments.fromRow, currentindex) lt arguments.requestSize">
+			<cfif currentindex neq arguments.fromRow>
+				<cfset strOut.append(", ") />
+			</cfif>
+
+			<cfset appendUpdateRow(out=strOut, qData=arguments.qData, row=currentindex, stContentTypes=stContentTypes) />
+
+			<cfset currentindex += 1 />
+		</cfloop>
+
+		<cfset strOut.append("]") />
+		<cfset stResult = application.fc.lib.cloudsearch.uploadDocuments(documents=strOut.toString()) />
+
+		<cfset stReturn.count = currentIndex - arguments.fromRow />
+		<cfset stReturn.builtToDate = arguments.qData.datetimeLastUpdated[currentindex] />
+		<cfset stReturn.nextRow = currentindex />
+
+		<cflog file="cloudsearch" text="Updated #stReturn.count# record/s" />
+
+		<cfreturn stReturn />
+	</cffunction>
+
 	<cffunction name="importIntoCloudSearch" access="public" output="false" returntype="struct">
 		<cfargument name="objectid" type="uuid" required="false" hint="The objectid of the content to import" />
 		<cfargument name="typename" type="string" required="false" hint="The typename of the content to import" />
@@ -613,36 +708,35 @@
 
 		<cfset stFields = application.fc.lib.cloudsearch.getTypeIndexFields(arguments.stObject.typename) />
 
-		<cfloop collection="#stFields#" item="field">			
-				<cfset property = stFields[field].property />		
-				<!--- If there is a function in the type for this property, use that instead of the default --->
-				<cfif structKeyExists(oType,"getCloudsearch#property#")>
-					<cfinvoke component="#oType#" method="getCloudsearch#property#" returnvariable="item">
-						<cfinvokeargument name="stObject" value="#arguments.stObject#" />
-						<cfinvokeargument name="property" value="#property#" />
-						<cfinvokeargument name="stIndexField" value="#stFields[field]#" />
-					</cfinvoke>
+		<cfloop collection="#stFields#" item="field">
+			<cfset property = stFields[field].property />		
+			<!--- If there is a function in the type for this property, use that instead of the default --->
+			<cfif structKeyExists(oType,"getCloudsearch#property#")>
+				<cfinvoke component="#oType#" method="getCloudsearch#property#" returnvariable="item">
+					<cfinvokeargument name="stObject" value="#arguments.stObject#" />
+					<cfinvokeargument name="property" value="#property#" />
+					<cfinvokeargument name="stIndexField" value="#stFields[field]#" />
+				</cfinvoke>
 
-					<cfset stResult[field] = item />
-				<cfelseif refind("_(yyyy(mmm(dd)?)?)$", property)>
-					<cfif application.fapi.showFarcryDate(arguments.stObject[rereplace(property, "_(yyyy(mmm(dd)?)?)$", "")])>
-						<cfset stResult[field] = dateFormat(arguments.stObject[rereplace(property, "_(yyyy(mmm(dd)?)?)$", "")], listlast(property, "_")) />
-					<cfelse>
-						<cfset stResult[field] = "none" />
-					</cfif>
-				<cfelseif property eq "status" and not structKeyExists(application.stCOAPI[arguments.stObject.typename].stProps, "status")>
-					<cfset stREsult[field] = "approved" />					
-				<cfelseif structKeyExists(this, "process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#")>
-					<cfinvoke component="#this#" method="process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#" returnvariable="item">
-						<cfinvokeargument name="stObject" value="#arguments.stObject#" />
-						<cfinvokeargument name="property" value="#property#" />
-					</cfinvoke>
-
-					<cfif len(item)>
-						<cfset stResult[field] = item />
-					</cfif>
+				<cfset stResult[field] = item />
+			<cfelseif refind("_(yyyy(mmm(dd)?)?)$", property)>
+				<cfif application.fapi.showFarcryDate(arguments.stObject[rereplace(property, "_(yyyy(mmm(dd)?)?)$", "")])>
+					<cfset stResult[field] = dateFormat(arguments.stObject[rereplace(property, "_(yyyy(mmm(dd)?)?)$", "")], listlast(property, "_")) />
+				<cfelse>
+					<cfset stResult[field] = "none" />
 				</cfif>
+			<cfelseif property eq "status" and not structKeyExists(application.stCOAPI[arguments.stObject.typename].stProps, "status")>
+				<cfset stREsult[field] = "approved" />					
+			<cfelseif structKeyExists(this, "process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#")>
+				<cfinvoke component="#this#" method="process#rereplace(stFields[field].type, "[^\w]", "", "ALL")#" returnvariable="item">
+					<cfinvokeargument name="stObject" value="#arguments.stObject#" />
+					<cfinvokeargument name="property" value="#property#" />
+				</cfinvoke>
 
+				<cfif len(item)>
+					<cfset stResult[field] = item />
+				</cfif>
+			</cfif>
 		</cfloop>
 
 		<cfreturn stResult />
