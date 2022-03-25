@@ -228,22 +228,24 @@ component {
 			for (var row in qCT) {
 				stCT = oCT.getData(objectid=qCT.objectid);
 
-				this.reloadingStatus.status_detail = "Querying for #stCT.contentType# content to push";
-				var qData = oCT.getRecordsToUpdate(typename=stCT.contentType, includeDeletions=false);
-
-				if (qData.recordcount) {
-					this.reloadingStatus.status_detail = "Reuploading #stCT.contentType#";
-
-					var stResult = { nextRow = 1 };
-					while (stResult.nextRow lte qData.recordcount) {
-						stResult = oCT.bulkImportIntoCloudSearchByQuery(qData=qData, fromRow=stResult.nextRow, maxRows=10);
-						this.reloadingStatus.reupload.count += stResult.count;
-						this.reloadingStatus.status_detail = "Reuploading #stCT.contentType# (#this.reloadingStatus.reupload.count#/#qData.recordcount#)";
-						this.reloadingStatus.reupload.time = numberFormat((getTickCount() - this.reloadingStatus.reupload.start) / 1000, "0.0") & "s";
+				if (structKeyExists(application.stCoapi, stCT.contentType)) {
+					this.reloadingStatus.status_detail = "Querying for #stCT.contentType# content to push";
+					var qData = oCT.getRecordsToUpdate(typename=stCT.contentType, includeDeletions=false);
+					
+					if (qData.recordcount) {
+						this.reloadingStatus.status_detail = "Reuploading #stCT.contentType#";
+						
+						var stResult = { nextRow = 1 };
+						while (stResult.nextRow lte qData.recordcount) {
+							stResult = oCT.bulkImportIntoCloudSearchByQuery(qData=qData, fromRow=stResult.nextRow, maxRows=10);
+							this.reloadingStatus.reupload.count += stResult.count;
+							this.reloadingStatus.status_detail = "Reuploading #stCT.contentType# (#this.reloadingStatus.reupload.count#/#qData.recordcount#)";
+							this.reloadingStatus.reupload.time = numberFormat((getTickCount() - this.reloadingStatus.reupload.start) / 1000, "0.0") & "s";
+						}
+						
+						stCT.builtToDate = qData.datetimeLastUpdated[qData.recordcount];
+						oCT.setData(stProperties=stCT);
 					}
-
-					stCT.builtToDate = qData.datetimeLastUpdated[qData.recordcount];
-					oCT.setData(stProperties=stCT);
 				}
 			}
 
