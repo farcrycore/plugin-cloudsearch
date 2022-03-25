@@ -185,7 +185,7 @@ component {
 		return { "status":"none" };
 	}
 
-	public struct function reuploadAllDocuments() {
+	public struct function reuploadAllDocuments(boolean clearDocuments=true) {
 		var domain = application.fapi.getConfig("cloudsearch","domain","");
 
 		try {
@@ -207,10 +207,12 @@ component {
 			var stResult = {};
 
 			// clear documents
-			this.reloadingStatus.status = "clearing";
-			this.reloadingStatus.status_detail = "Clearing documents";
-			this.reloadingStatus.clear.start = getTickCount();
-			this.reloadingStatus.clear.count = clearDocuments(domain);
+			if (arguments.clearDocuments is true) {
+				this.reloadingStatus.status = "clearing";
+				this.reloadingStatus.status_detail = "Clearing documents";
+				this.reloadingStatus.clear.start = getTickCount();
+				this.reloadingStatus.clear.count = clearDocuments(domain);
+			}
 
 			// reupload documents
 			this.reloadingStatus.status = "reuploading";
