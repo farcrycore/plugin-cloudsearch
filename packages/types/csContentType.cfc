@@ -879,12 +879,14 @@
 
 		<cfif isSimpleValue(value)>
 			<cfset aResult = listToArray(value,",#chr(10)##chr(13)#") />
-		<cfelseif arrayLen(value) and isstruct(value[1])>
-			<cfloop array="#value#" index="item">
-				<cfset arrayAppend(aResult, item.data) />
-			</cfloop>
 		<cfelseif arrayLen(value)>
-			<cfset aResult = value />
+			<cfloop array="#value#" index="item">
+				<cfif isstruct(item) and structKeyExists(item, "data")>
+					<cfset arrayAppend(aResult, item.data) />
+				<cfelseif isSimpleValue(item)>
+					<cfset arrayAppend(aResult, item) />
+				</cfif>
+			</cfloop>
 		</cfif>
 
 		<cfreturn aResult />

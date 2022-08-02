@@ -22,7 +22,12 @@ Base features include:
 - Register the plugin in the projects constructor; ./www/farcryConstructor.cfm
 - Restart your application
 - Open the "Cloudsearch" config and fill in the details of your service account
-- This plugin requires that the AWS Java SDK 1.11 jars and Jedis 2.8.1 (and their dependancies) be in the Java path
+- Update the Dockerfile to install the relevant AWS jars. The entire SDK can be installed using:
+  ```
+  RUN wget -q https://daemon-provisioning-resources.s3.ap-southeast-2.amazonaws.com/aws/aws-java-sdk-1.12.233.zip -O /tmp/aws-sdk.zip && \
+    unzip -j /tmp/aws-sdk.zip -d /usr/local/tomcat/lib/ && \
+    rm /tmp/aws-sdk.zip
+  ```
 
 ### AWS Cloudsearch
 
