@@ -185,7 +185,7 @@ component {
 		return { "status":"none" };
 	}
 
-	public struct function reuploadAllDocuments(boolean clearDocuments=true) {
+	public struct function reuploadAllDocuments(boolean bClearDocuments=true) {
 		var domain = application.fapi.getConfig("cloudsearch","domain","");
 
 		try {
@@ -207,7 +207,7 @@ component {
 			var stResult = {};
 
 			// clear documents
-			if (arguments.clearDocuments is true) {
+			if (arguments.bClearDocuments) {
 				this.reloadingStatus.status = "clearing";
 				this.reloadingStatus.status_detail = "Clearing documents";
 				this.reloadingStatus.clear.start = getTickCount();
