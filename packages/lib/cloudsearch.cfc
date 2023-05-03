@@ -1002,7 +1002,7 @@ component {
 		var boost = "";
 
 		for (key in arguments.stIndexFields){
-			if (listfindnocase("text,text-array",arguments.stIndexFields[key].type)) {
+			if (listfindnocase("text,text-array,literal-array",arguments.stIndexFields[key].type)) {
 				if (arguments.bBoost){
 					boost = " boost=#arguments.stIndexFields[key].weight#";
 				}
@@ -1022,7 +1022,7 @@ component {
 		var boost = "";
 
 		for (key in arguments.stIndexFields){
-			if (listfindnocase("text,text-array",arguments.stIndexFields[key].type)) {
+			if (listfindnocase("text,text-array,literal,literal-array",arguments.stIndexFields[key].type)) {
 				if (arguments.bBoost){
 					boost = " boost=#arguments.stIndexFields[key].weight#";
 				}
