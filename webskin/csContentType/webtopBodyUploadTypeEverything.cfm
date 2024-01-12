@@ -66,8 +66,11 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 			<cfloop query="qContent">
 				<!--- remove from application scope --->
 				<cfset APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE] = ListDeleteAt(APPLICATION.webtopBodyUploadTypeEverything[URL.CONTENTTYPE], 1)>
-				
-				<cfif qContent.operation eq "updated" and (not structKeyExists(oContent, "isIndexable") or oContent.isIndexable(objectid=qContent.objectid))>
+				<cfset var operation = qContent.operation>
+				<cfif qContent.operation eq "updated" and (structKeyExists(oContent, "isIndexable") AND NOT oContent.isIndexable(objectid=qContent.objectid))>
+					<cfset operation = "deleted">
+				</cfif>
+				<cfif operation eq "updated">
 					<cfset stContentObject = oContent.getData(objectid=qContent.objectid) />
 					<cfset stContent = getCloudsearchDocument(stObject=stContentObject) />
 					
@@ -83,7 +86,7 @@ http://admin.yaffa-env-dsp.192.168.99.100.nip.io
 					<cfset strOut.append('}') />
 					<cfset bAppend = true >
 					<cfset bFirstDocumentFound = true >
-				<cfelseif qContent.operation eq "deleted">
+				<cfelseif operation eq "deleted">
 
 					<cfif bAppend AND bFirstDocumentFound>
 						<cfset strOut.append(",") />
