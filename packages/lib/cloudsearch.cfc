@@ -662,6 +662,7 @@ component {
 		}
 		stResult["rawFacets"] = arguments.rawFacets;
 		stResult["recordcount"] = hits.getFound();
+		stResult["sort"] = arguments.sort;
 		stResult["page"] = arguments.page;
 		stResult["maxrows"] = arguments.maxrows;
 		stResult["startRow"] = (stResult.page - 1) * stResult.maxrows + 1;
