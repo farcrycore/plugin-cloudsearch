@@ -144,15 +144,16 @@ component {
 		if (arguments.type eq "config" and not structkeyexists(this, "client")){
 			writeLog(file="cloudsearch",text="Starting CloudSearch config client");
 
-			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
-			tmpClient = createobject("java","com.amazonaws.services.cloudsearchv2.AmazonCloudSearchClient").init(credentials);
+			var awsCloudsearchConfig = createObject("java", "com.amazonaws.services.cloudsearchv2.AmazonCloudSearchClientBuilder");
+			var basicAWSCredentials = createObject("java", "com.amazonaws.auth.BasicAWSCredentials").init(accessID, accessSecret);
+			var staticCredentialsProvider = createObject("java", "com.amazonaws.auth.AWSStaticCredentialsProvider").init(basicAWSCredentials);
 
-			regions = createobject("java","com.amazonaws.regions.Regions");
-			region = createobject("java","com.amazonaws.regions.Region");
-			var regionEnum = regions.fromName(regionname);
-			var regionObj = region.getRegion(regionEnum);
-			writeLog(file="cloudsearch",text="Setting region to [#regionObj.getName()#]");
-			tmpClient.setRegion(regionObj);
+			tmpClient = awsCloudsearchConfig.standard()
+				.withCredentials(staticCredentialsProvider)
+				.withRegion(regionname)
+				.build();
+
+				writeLog(file="cloudsearch",text="Setting region to [#regionname#]");
 
 			this.client = tmpClient;
 		}
