@@ -159,12 +159,19 @@ component {
 		if (arguments.type eq "domain" and not structkeyexists(this, "domainclient")){
 			writeLog(file="cloudsearch",text="Starting CloudSearch domain client");
 
-			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
-			tmpClient = createobject("java","com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClient").init(credentials);
-
 			endpoint = getDomainEndpoint(arguments.domain);
+
+			var awsCloudsearchDomain = createObject("java", "com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClientBuilder");
+			var basicAWSCredentials = createObject("java", "com.amazonaws.auth.BasicAWSCredentials").init(accessID, accessSecret);
+			var staticCredentialsProvider = createObject("java", "com.amazonaws.auth.AWSStaticCredentialsProvider").init(basicAWSCredentials);
+			var endpointConfiguration = createObject("java", "com.amazonaws.client.builder.AwsClientBuilder$EndpointConfiguration").init(endpoint, regionname);
+
+			tmpClient = awsCloudsearchDomain.standard()
+				.withCredentials(staticCredentialsProvider)
+				.withEndpointConfiguration(endpointConfiguration)
+				.build();
+
 			writeLog(file="cloudsearch",text="Setting endpoint to [#endpoint#]");
-			tmpClient.setEndpoint(endpoint);
 
 			this.domainclient = tmpClient;
 		}
