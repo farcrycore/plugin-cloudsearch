@@ -153,7 +153,7 @@ component {
 				.withRegion(regionname)
 				.build();
 
-				writeLog(file="cloudsearch",text="Setting region to [#regionname#]");
+			writeLog(file="cloudsearch",text="Setting region to [#regionname#]");
 
 			this.client = tmpClient;
 		}
