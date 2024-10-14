@@ -144,35 +144,27 @@ component {
 		if (arguments.type eq "config" and not structkeyexists(this, "client")){
 			writeLog(file="cloudsearch",text="Starting CloudSearch config client");
 
-			var awsCloudsearchConfig = createObject("java", "com.amazonaws.services.cloudsearchv2.AmazonCloudSearchClientBuilder");
-			var basicAWSCredentials = createObject("java", "com.amazonaws.auth.BasicAWSCredentials").init(accessID, accessSecret);
-			var staticCredentialsProvider = createObject("java", "com.amazonaws.auth.AWSStaticCredentialsProvider").init(basicAWSCredentials);
+			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
+			tmpClient = createobject("java","com.amazonaws.services.cloudsearchv2.AmazonCloudSearchClient").init(credentials);
 
-			tmpClient = awsCloudsearchConfig.standard()
-				.withCredentials(staticCredentialsProvider)
-				.withRegion(regionname)
-				.build();
-
-			writeLog(file="cloudsearch",text="Setting region to [#regionname#]");
+			regions = createobject("java","com.amazonaws.regions.Regions");
+			region = createobject("java","com.amazonaws.regions.Region");
+			var regionEnum = regions.fromName(regionname);
+			var regionObj = region.getRegion(regionEnum);
+			writeLog(file="cloudsearch",text="Setting region to [#regionObj.getName()#]");
+			tmpClient.setRegion(regionObj);
 
 			this.client = tmpClient;
 		}
 		if (arguments.type eq "domain" and not structkeyexists(this, "domainclient")){
 			writeLog(file="cloudsearch",text="Starting CloudSearch domain client");
 
+			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
+			tmpClient = createobject("java","com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClient").init(credentials);
+
 			endpoint = getDomainEndpoint(arguments.domain);
-
-			var awsCloudsearchDomain = createObject("java", "com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClientBuilder");
-			var basicAWSCredentials = createObject("java", "com.amazonaws.auth.BasicAWSCredentials").init(accessID, accessSecret);
-			var staticCredentialsProvider = createObject("java", "com.amazonaws.auth.AWSStaticCredentialsProvider").init(basicAWSCredentials);
-			var endpointConfiguration = createObject("java", "com.amazonaws.client.builder.AwsClientBuilder$EndpointConfiguration").init(endpoint, regionname);
-
-			tmpClient = awsCloudsearchDomain.standard()
-				.withCredentials(staticCredentialsProvider)
-				.withEndpointConfiguration(endpointConfiguration)
-				.build();
-
 			writeLog(file="cloudsearch",text="Setting endpoint to [#endpoint#]");
+			tmpClient.setEndpoint(endpoint);
 
 			this.domainclient = tmpClient;
 		}
