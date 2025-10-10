@@ -119,10 +119,8 @@ component {
 	public boolean function isEnabled(){
 		var domain = application.fapi.getConfig("cloudsearch","domain","");
 		var regionname = application.fapi.getConfig("cloudsearch","region","");
-		var accessID = application.fapi.getConfig("cloudsearch","accessID","");
-		var accessSecret = application.fapi.getConfig("cloudsearch","accessSecret","");
 
-		return len(domain) AND len(regionname) AND len(accessID) AND len(accessSecret);
+		return len(domain) AND len(regionname);
 	}
 
 	public any function getClient(string type="config", string domain=""){
@@ -132,21 +130,32 @@ component {
 		var accessSecret = application.fapi.getConfig("cloudsearch","accessSecret","");
 
 		var awsCredentials = "";
+		var credentialsProvider = "";
 		var region = "";
 		var tmpClient = "";
 		var endpoint = "";
+		var useIAMRole = false;
 
 		if (not isEnabled()){
 			throw(message="The CloudSearch settings for this application have not been set up");
 		}
 
-		if (arguments.type eq "config" and not structkeyexists(this, "client")){
-			writeLog(file="cloudsearch",text="Starting CloudSearch config client");
-
-			// AWS SDK 2.x - Use StaticCredentialsProvider and AwsBasicCredentials
+		// Determine authentication method
+		if (len(accessID) AND len(accessSecret)) {
+			// Use explicit API key credentials
+			writeLog(file="cloudsearch",text="Using explicit AWS credentials (access key)");
 			awsCredentials = createobject("java","software.amazon.awssdk.auth.credentials.AwsBasicCredentials").create(accessID, accessSecret);
-			var credentialsProvider = createobject("java","software.amazon.awssdk.auth.credentials.StaticCredentialsProvider").create(awsCredentials);
-			
+			credentialsProvider = createobject("java","software.amazon.awssdk.auth.credentials.StaticCredentialsProvider").create(awsCredentials);
+		} else {
+			// Use IAM role / default credentials chain
+			writeLog(file="cloudsearch",text="Using IAM role / default credentials chain");
+			credentialsProvider = createobject("java","software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider").create();
+			useIAMRole = true;
+		}
+
+		if (arguments.type eq "config" and not structkeyexists(this, "client")){
+			writeLog(file="cloudsearch",text="Starting CloudSearch config client (#useIAMRole ? 'IAM role' : 'API key'#)");
+
 			// AWS SDK 2.x - Use Region.of() instead of Region.getRegion()
 			region = createobject("java","software.amazon.awssdk.regions.Region").of(regionname);
 			writeLog(file="cloudsearch",text="Setting region to [#region.toString()#]");
@@ -160,12 +169,8 @@ component {
 			this.client = tmpClient;
 		}
 		if (arguments.type eq "domain" and not structkeyexists(this, "domainclient")){
-			writeLog(file="cloudsearch",text="Starting CloudSearch domain client");
+			writeLog(file="cloudsearch",text="Starting CloudSearch domain client (#useIAMRole ? 'IAM role' : 'API key'#)");
 
-			// AWS SDK 2.x - Use StaticCredentialsProvider and AwsBasicCredentials
-			awsCredentials = createobject("java","software.amazon.awssdk.auth.credentials.AwsBasicCredentials").create(accessID, accessSecret);
-			var credentialsProvider = createobject("java","software.amazon.awssdk.auth.credentials.StaticCredentialsProvider").create(awsCredentials);
-			
 			region = createobject("java","software.amazon.awssdk.regions.Region").of(regionname);
 			endpoint = getDomainEndpoint(arguments.domain);
 			
