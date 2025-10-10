@@ -131,8 +131,7 @@ component {
 		var accessID = application.fapi.getConfig("cloudsearch","accessID","");
 		var accessSecret = application.fapi.getConfig("cloudsearch","accessSecret","");
 
-		var credentials = "";
-		var regions = "";
+		var awsCredentials = "";
 		var region = "";
 		var tmpClient = "";
 		var endpoint = "";
@@ -144,27 +143,46 @@ component {
 		if (arguments.type eq "config" and not structkeyexists(this, "client")){
 			writeLog(file="cloudsearch",text="Starting CloudSearch config client");
 
-			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
-			tmpClient = createobject("java","com.amazonaws.services.cloudsearchv2.AmazonCloudSearchClient").init(credentials);
+			// AWS SDK 2.x - Use StaticCredentialsProvider and AwsBasicCredentials
+			awsCredentials = createobject("java","software.amazon.awssdk.auth.credentials.AwsBasicCredentials").create(accessID, accessSecret);
+			var credentialsProvider = createobject("java","software.amazon.awssdk.auth.credentials.StaticCredentialsProvider").create(awsCredentials);
+			
+			// AWS SDK 2.x - Use Region.of() instead of Region.getRegion()
+			region = createobject("java","software.amazon.awssdk.regions.Region").of(regionname);
+			writeLog(file="cloudsearch",text="Setting region to [#region.toString()#]");
 
-			regions = createobject("java","com.amazonaws.regions.Regions");
-			region = createobject("java","com.amazonaws.regions.Region");
-			var regionEnum = regions.fromName(regionname);
-			var regionObj = region.getRegion(regionEnum);
-			writeLog(file="cloudsearch",text="Setting region to [#regionObj.getName()#]");
-			tmpClient.setRegion(regionObj);
+			// AWS SDK 2.x - Use CloudSearchClient builder
+			tmpClient = createobject("java","software.amazon.awssdk.services.cloudsearch.CloudSearchClient").builder()
+				.region(region)
+				.credentialsProvider(credentialsProvider)
+				.build();
 
 			this.client = tmpClient;
 		}
 		if (arguments.type eq "domain" and not structkeyexists(this, "domainclient")){
 			writeLog(file="cloudsearch",text="Starting CloudSearch domain client");
 
-			credentials = createobject("java","com.amazonaws.auth.BasicAWSCredentials").init(accessID,accessSecret);
-			tmpClient = createobject("java","com.amazonaws.services.cloudsearchdomain.AmazonCloudSearchDomainClient").init(credentials);
-
+			// AWS SDK 2.x - Use StaticCredentialsProvider and AwsBasicCredentials
+			awsCredentials = createobject("java","software.amazon.awssdk.auth.credentials.AwsBasicCredentials").create(accessID, accessSecret);
+			var credentialsProvider = createobject("java","software.amazon.awssdk.auth.credentials.StaticCredentialsProvider").create(awsCredentials);
+			
+			region = createobject("java","software.amazon.awssdk.regions.Region").of(regionname);
 			endpoint = getDomainEndpoint(arguments.domain);
+			
+			// Ensure endpoint has https:// scheme
+			if (not findNoCase("https://", endpoint) and not findNoCase("http://", endpoint)) {
+				endpoint = "https://" & endpoint;
+			}
+			
 			writeLog(file="cloudsearch",text="Setting endpoint to [#endpoint#]");
-			tmpClient.setEndpoint(endpoint);
+
+			// AWS SDK 2.x - Use CloudSearchDomainClient builder with custom endpoint
+			var endpointOverride = createobject("java","java.net.URI").create(endpoint);
+			tmpClient = createobject("java","software.amazon.awssdk.services.cloudsearchdomain.CloudSearchDomainClient").builder()
+				.region(region)
+				.credentialsProvider(credentialsProvider)
+				.endpointOverride(endpointOverride)
+				.build();
 
 			this.domainclient = tmpClient;
 		}
@@ -263,21 +281,25 @@ component {
 	/* CloudSearch API Wrappers */
 	public query function getDomains(){
 		var csClient = getClient();
-		var describeDomainsResult = csClient.describeDomains();
+		
+		// AWS SDK 2.x - Use DescribeDomainsRequest builder
+		var describeDomainsRequest = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DescribeDomainsRequest").builder().build();
+		var describeDomainsResponse = csClient.describeDomains(describeDomainsRequest);
 		var domainResult = {};
 		var qResult = querynew("id,domain,created,processing,requires_index,deleted,instance_count,instance_type,endpoint", "varchar,varchar,bit,bit,bit,bit,integer,varchar,varchar");
 
-		for (domainResult in describeDomainsResult.getDomainStatusList()){
+		// AWS SDK 2.x - domainStatusList() instead of getDomainStatusList()
+		for (domainResult in describeDomainsResponse.domainStatusList()){
 			queryAddRow(qResult);
-			querySetCell(qResult,"id",domainResult.getDomainId());
-			querySetCell(qResult,"domain",domainResult.getDomainName());
-			querySetCell(qResult,"created",domainResult.getCreated());
-			querySetCell(qResult,"processing",domainResult.getProcessing());
-			querySetCell(qResult,"requires_index",domainResult.getRequiresIndexDocuments());
-			querySetCell(qResult,"deleted",domainResult.getDeleted());
-			querySetCell(qResult,"instance_count",domainResult.getSearchInstanceCount());
-			querySetCell(qResult,"instance_type",domainResult.getSearchInstanceType());
-			querySetCell(qResult,"endpoint",domainResult.getDocService().getEndpoint());
+			querySetCell(qResult,"id",domainResult.domainId());
+			querySetCell(qResult,"domain",domainResult.domainName());
+			querySetCell(qResult,"created",domainResult.created());
+			querySetCell(qResult,"processing",domainResult.processing());
+			querySetCell(qResult,"requires_index",domainResult.requiresIndexDocuments());
+			querySetCell(qResult,"deleted",domainResult.deleted());
+			querySetCell(qResult,"instance_count",domainResult.searchInstanceCount());
+			querySetCell(qResult,"instance_type",domainResult.searchInstanceType());
+			querySetCell(qResult,"endpoint",domainResult.docService().endpoint());
 		}
 
 		return qResult;
@@ -285,8 +307,9 @@ component {
 
 	public query function getIndexFields(string domain, string fields) {
 		var csClient = getClient();
-		var describeIndexFieldsRequest = createobject("java","com.amazonaws.services.cloudsearchv2.model.DescribeIndexFieldsRequest").init();
+		var describeIndexFieldsRequestBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DescribeIndexFieldsRequest").builder();
 		var describeIndexFieldsResponse = {};
+		var indexFieldsList = [];
 		var indexFieldStatus = {};
 		var indexField = {};
 		var indexStatus = {};
@@ -296,24 +319,35 @@ component {
 			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
 		}
 
-		describeIndexFieldsRequest.setDomainName(arguments.domain);
+		describeIndexFieldsRequestBuilder.domainName(arguments.domain);
 		if (structKeyExists(arguments,"fields")){
-			describeIndexFieldsRequest.setFieldNames(javaCast("string[]",listtoarray(arguments.fields)));
+			// AWS SDK 2.x - Use fieldNames() method with collection
+			var fieldNamesList = createObject("java", "java.util.ArrayList").init();
+			for (var fieldName in listtoarray(arguments.fields)) {
+				fieldNamesList.add(fieldName);
+			}
+			describeIndexFieldsRequestBuilder.fieldNames(fieldNamesList);
 		}
 
+		var describeIndexFieldsRequest = describeIndexFieldsRequestBuilder.build();
 		describeIndexFieldsResponse = csClient.describeIndexFields(describeIndexFieldsRequest);
 
-		for (indexFieldStatus in describeIndexFieldsResponse.getIndexFields()){
+		// Get the list of index fields - this is a Java List, not a CF array
+    	indexFieldsList = describeIndexFieldsResponse.indexFields();
+		// Iterate using Java iterator or size/get pattern
+		for (var i = 0; i < indexFieldsList.size(); i++){
+			indexFieldStatus = indexFieldsList.get(i);
+			
 			queryAddRow(qResult);
 
-			indexField = indexFieldStatus.getOptions();
-			querySetCell(qResult,"field",indexField.getIndexFieldName());
-			querySetCell(qResult,"type",indexField.getIndexFieldType());
+			indexField = indexFieldStatus.options();
+			querySetCell(qResult,"field",indexField.indexFieldName());
+			querySetCell(qResult,"type",indexField.indexFieldTypeAsString());
 			insertIndexFieldOptions(qResult, qResult.recordcount, indexField);
 
-			indexStatus = indexFieldStatus.getStatus();
-			querySetCell(qResult,"pending_deletion",indexStatus.getPendingDeletion());
-			querySetCell(qResult,"state",indexStatus.getState());
+			indexStatus = indexFieldStatus.status();
+			querySetCell(qResult,"pending_deletion",indexStatus.pendingDeletion());
+			querySetCell(qResult,"state",indexStatus.stateAsString());
 		}
 
 		return qResult;
@@ -321,7 +355,6 @@ component {
 
 	public query function updateIndexField(string domain, required string field, required string type, required string default_value, required boolean return, required boolean search, required boolean facet, required boolean sort, required boolean highlight, required string analysis_scheme, query qResult){
 		var csClient = getClient();
-		var defineIndexFieldRequest = createobject("java","com.amazonaws.services.cloudsearchv2.model.DefineIndexFieldRequest").init();
 		var indexField = createIndexFieldObject(argumentCollection=arguments);
 		var defineIndexFieldResponse = {};
 		var indexFieldStatus = {};
@@ -335,30 +368,32 @@ component {
 			arguments.qResult = createIndexQuery();
 		}
 
-		defineIndexFieldRequest.setDomainName(arguments.domain);
-		defineIndexFieldRequest.setIndexField(indexField);
+		// AWS SDK 2.x - Use DefineIndexFieldRequest builder
+		var defineIndexFieldRequest = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DefineIndexFieldRequest").builder()
+			.domainName(arguments.domain)
+			.indexField(indexField)
+			.build();
 
 		defineIndexFieldResponse = csClient.defineIndexField(defineIndexFieldRequest);
 
 		// create a single-row query for the update result
-		indexFieldStatus = defineIndexFieldResponse.getIndexField();
+		indexFieldStatus = defineIndexFieldResponse.indexField();
 		queryAddRow(arguments.qResult);
 
-		indexField = indexFieldStatus.getOptions();
-		querySetCell(arguments.qResult,"field",indexField.getIndexFieldName());
-		querySetCell(arguments.qResult,"type",indexField.getIndexFieldType());
+		indexField = indexFieldStatus.options();
+		querySetCell(arguments.qResult,"field",indexField.indexFieldName());
+		querySetCell(arguments.qResult,"type",indexField.indexFieldTypeAsString());
 		insertIndexFieldOptions(arguments.qResult, 1, indexField);
 
-		indexStatus = indexFieldStatus.getStatus();
-		querySetCell(arguments.qResult,"pending_deletion",indexStatus.getPendingDeletion());
-		querySetCell(arguments.qResult,"state",indexStatus.getState());
+		indexStatus = indexFieldStatus.status();
+		querySetCell(arguments.qResult,"pending_deletion",indexStatus.pendingDeletion());
+		querySetCell(arguments.qResult,"state",indexStatus.stateAsString());
 
 		return arguments.qResult;
 	}
 
 	public query function deleteIndexField(string domain, required string field, query qResult){
 		var csClient = getClient();
-		var deleteIndexFieldRequest = createobject("java","com.amazonaws.services.cloudsearchv2.model.DeleteIndexFieldRequest").init();
 		var deleteIndexFieldResponse = {};
 		var indexFieldStatus = {};
 		var indexStatus = {};
@@ -371,23 +406,26 @@ component {
 			arguments.qResult = createIndexQuery();
 		}
 
-		deleteIndexFieldRequest.setDomainName(arguments.domain);
-		deleteIndexFieldRequest.setIndexFieldName(arguments.field);
+		// AWS SDK 2.x - Use DeleteIndexFieldRequest builder
+		var deleteIndexFieldRequest = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DeleteIndexFieldRequest").builder()
+			.domainName(arguments.domain)
+			.indexFieldName(arguments.field)
+			.build();
 
 		deleteIndexFieldResponse = csClient.deleteIndexField(deleteIndexFieldRequest);
 
 		// create a single-row query for the update result
-		indexFieldStatus = deleteIndexFieldResponse.getIndexField();
+		indexFieldStatus = deleteIndexFieldResponse.indexField();
 		queryAddRow(arguments.qResult);
 
-		indexField = indexFieldStatus.getOptions();
-		querySetCell(arguments.qResult,"field",indexField.getIndexFieldName());
-		querySetCell(arguments.qResult,"type",indexField.getIndexFieldType());
+		indexField = indexFieldStatus.options();
+		querySetCell(arguments.qResult,"field",indexField.indexFieldName());
+		querySetCell(arguments.qResult,"type",indexField.indexFieldTypeAsString());
 		insertIndexFieldOptions(arguments.qResult, 1, indexField);
 
-		indexStatus = indexFieldStatus.getStatus();
-		querySetCell(arguments.qResult,"pending_deletion",indexStatus.getPendingDeletion());
-		querySetCell(arguments.qResult,"state",indexStatus.getState());
+		indexStatus = indexFieldStatus.status();
+		querySetCell(arguments.qResult,"pending_deletion",indexStatus.pendingDeletion());
+		querySetCell(arguments.qResult,"state",indexStatus.stateAsString());
 
 		return arguments.qResult;
 	}
@@ -429,7 +467,6 @@ component {
 
 	public array function indexDocuments(string domain){
 		var csClient = getClient();
-		var indexDocumentsRequest = createobject("java","com.amazonaws.services.cloudsearchv2.model.IndexDocumentsRequest").init();
 		var indexDocumentsResponse = {};
 		var aResult = [];
 		var field = "";
@@ -438,11 +475,15 @@ component {
 			arguments.domain = application.fapi.getConfig("cloudsearch","domain","")
 		}
 
-		indexDocumentsRequest.setDomainName(arguments.domain);
+		// AWS SDK 2.x - Use IndexDocumentsRequest builder
+		var indexDocumentsRequest = createobject("java","software.amazon.awssdk.services.cloudsearch.model.IndexDocumentsRequest").builder()
+			.domainName(arguments.domain)
+			.build();
 
 		indexDocumentsResponse = csClient.indexDocuments(indexDocumentsRequest);
 
-		for (field in indexDocumentsResponse.getFieldNames()){
+		// AWS SDK 2.x - fieldNames() instead of getFieldNames()
+		for (field in indexDocumentsResponse.fieldNames()){
 			arrayAppend(aResult,field)
 		}
 
@@ -451,9 +492,7 @@ component {
 
 	public struct function uploadDocuments(string domain, required string documents){
 		var csdClient = "";
-		var uploadDocumentsRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.UploadDocumentsRequest").init();
 		var uploadDocumentsResponse = {};
-		var contentType = createobject("java","com.amazonaws.services.cloudsearchdomain.model.ContentType").fromValue("application/json")
 		var inputStream = "";
 		var aWarnings = [];
 		var warning = {};
@@ -474,14 +513,16 @@ component {
 
 		csdClient = getClient("domain", arguments.domain);
 
-		uploadDocumentsRequest.setDocuments(inputStream);
-		uploadDocumentsRequest.setContentLength(getFileInfo(documentFile).size);
-		uploadDocumentsRequest.setContentType(contentType);
+		// AWS SDK 2.x - Use UploadDocumentsRequest builder with RequestBody
+		var requestBody = createobject("java","software.amazon.awssdk.core.sync.RequestBody").fromInputStream(inputStream, getFileInfo(documentFile).size);
+		var uploadDocumentsRequest = createobject("java","software.amazon.awssdk.services.cloudsearchdomain.model.UploadDocumentsRequest").builder()
+			.contentType("application/json")
+			.build();
 
 		try {
-			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
+			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest, requestBody);
 		}
-		catch (com.amazonaws.services.cloudsearchdomain.model.DocumentServiceException e) {
+		catch (software.amazon.awssdk.services.cloudsearchdomain.model.DocumentServiceException e) {
 			if (len(arguments.documents) lt 500000)
 				throw(message=e.message, detail='{"domain":"#arguments.domain#", "documents":#arguments.documents#}');
 			else
@@ -491,21 +532,21 @@ component {
 		// remove temporary file
 		application.fc.lib.cdn.ioDeleteFile(location="temp",file="/cloudsearch/documents-#id#.json");
 
-		for (warning in uploadDocumentsResponse.getWarnings()){
-			arrayAppend(aWarnings,warning.getMessage());
+		// AWS SDK 2.x - Use method names without get prefix
+		for (warning in uploadDocumentsResponse.warnings()){
+			arrayAppend(aWarnings,warning.message());
 		}
 
 		return {
-			"adds" = uploadDocumentsResponse.getAdds(),
-			"deletes" = uploadDocumentsResponse.getDeletes(),
-			"status" = uploadDocumentsResponse.getStatus(),
+			"adds" = uploadDocumentsResponse.adds(),
+			"deletes" = uploadDocumentsResponse.deletes(),
+			"status" = uploadDocumentsResponse.status(),
 			"warnings" = aWarnings
 		};
 	}
 
 	public struct function search(string domain, string typename, string rawQuery, string queryParser="simple", string rawFilter, string rawFacets, array conditions, array filters, struct facets={}, numeric maxrows=10, numeric page=1, boolean log=true, string sort="_score desc") {
 		var csdClient = "";
-		var searchRequest = createobject("java","com.amazonaws.services.cloudsearchdomain.model.SearchRequest").init();
 		var searchResponse = {};
 		var hits = {};
 		var hit = {};
@@ -623,29 +664,35 @@ component {
 			}
 		}
 
-		searchRequest.setQueryParser(arguments.queryParser);
-		searchRequest.setQuery(arguments.rawQuery);
+		// AWS SDK 2.x - Use SearchRequest builder
+		var searchRequestBuilder = createobject("java","software.amazon.awssdk.services.cloudsearchdomain.model.SearchRequest").builder()
+			.queryParser(arguments.queryParser)
+			.query(arguments.rawQuery)
+			.start(javacast("long", arguments.maxrows * (arguments.page - 1)))
+			.size(javacast("long", arguments.maxrows))
+			.sort(arguments.sort);
+
 		if (len(arguments.rawFilter)){
-			searchRequest.setFilterQuery(arguments.rawFilter);
+			searchRequestBuilder.filterQuery(arguments.rawFilter);
 		}
 		if (len(arguments.rawFacets)){
-			searchRequest.setFacet(arguments.rawFacets);
+			searchRequestBuilder.facet(arguments.rawFacets);
 		}
-		searchRequest.setStart(arguments.maxrows * (arguments.page - 1));
-		searchRequest.setSize(arguments.maxrows);
-		searchRequest.setSort(arguments.sort);
+
+		var searchRequest = searchRequestBuilder.build();
 
 		try {
 			searchResponse = csdClient.search(searchRequest);
 		}
-		catch (com.amazonaws.services.cloudsearchdomain.model.SearchException e) {
+		catch (software.amazon.awssdk.services.cloudsearchdomain.model.SearchException e) {
 			throw(message=e.message, detail=serializeJSON(duplicate(arguments)));
 		}
-		hits = searchResponse.getHits();
-		facetResult = searchResponse.getFacets();
+		hits = searchResponse.hits();
+		facetResult = searchResponse.facets();
 
-		stResult["time"] = searchResponse.getStatus().getTimems();
-		stResult["cursor"] = hits.getCursor();
+		// AWS SDK 2.x - Use method names without get prefix
+		stResult["time"] = searchResponse.status().timems();
+		stResult["cursor"] = hits.cursor();
 		stResult["items"] = querynew("objectid,typename,highlights");
 		stResult["stFacets"] = {};
 		if (structKeyExists(arguments,"conditions")){
@@ -661,26 +708,26 @@ component {
 			stResult["facets"] = arguments.facets;
 		}
 		stResult["rawFacets"] = arguments.rawFacets;
-		stResult["recordcount"] = hits.getFound();
+		stResult["recordcount"] = hits.found();
 		stResult["sort"] = arguments.sort;
 		stResult["page"] = arguments.page;
 		stResult["maxrows"] = arguments.maxrows;
 		stResult["startRow"] = (stResult.page - 1) * stResult.maxrows + 1;
 		stResult["endRow"] = min(stResult.page * stResult.maxrows, stResult.recordcount);
 
-		for (hit in hits.getHit()){
+		for (hit in hits.hit()){
 			queryAddRow(stResult.items);
-			querySetCell(stResult.items,"objectid",hit.getId());
-			querySetCell(stResult.items,"typename",hit.getFields()["typename_literal"][1]);
-			querySetCell(stResult.items,"highlights",serializeJSON(duplicate(hit.getHighlights())));
+			querySetCell(stResult.items,"objectid",hit.id());
+			querySetCell(stResult.items,"typename",hit.fields().get("typename_literal")[1]);
+			querySetCell(stResult.items,"highlights",serializeJSON(duplicate(hit.highlights())));
 		}
 
-		for (key in facetResult){
-			buckets = facetResult[key].getBuckets();
+		for (key in facetResult.keySet()){
+			buckets = facetResult.get(key).buckets();
 			stResult["stFacets"][stIndexFields[key].property] = [];
 
 			for (bucket in buckets){
-				arrayappend(stResult["stFacets"][stIndexFields[key].property], { "value"=bucket.getValue(), "count"=bucket.getCount() });
+				arrayappend(stResult["stFacets"][stIndexFields[key].property], { "value"=bucket.value(), "count"=bucket.count() });
 			}
 		}
 
@@ -700,47 +747,47 @@ component {
 	}
 
 	private any function insertIndexFieldOptions(required query q, required numeric row, required indexField){
-		var type = arguments.indexField.getIndexFieldType();
+		var type = arguments.indexField.indexFieldTypeAsString();
 		var indexFieldOptions = {};
 
 		switch (type) {
 			case "date":
-				indexFieldOptions = arguments.indexField.getDateOptions();
+				indexFieldOptions = arguments.indexField.dateOptions();
 				break;
 			case "date-array":
-				indexFieldOptions = arguments.indexField.getDateArrayOptions();
+				indexFieldOptions = arguments.indexField.dateArrayOptions();
 				break;
 			case "double":
-				indexFieldOptions = arguments.indexField.getDoubleOptions();
+				indexFieldOptions = arguments.indexField.doubleOptions();
 				break;
 			case "double-array":
-				indexFieldOptions = arguments.indexField.getDoubleArrayOptions();
+				indexFieldOptions = arguments.indexField.doubleArrayOptions();
 				break;
 			case "int":
-				indexFieldOptions = arguments.indexField.getIntOptions();
+				indexFieldOptions = arguments.indexField.intOptions();
 				break;
 			case "int-array":
-				indexFieldOptions = arguments.indexField.getIntArrayOptions();
+				indexFieldOptions = arguments.indexField.intArrayOptions();
 				break;
 			case "lat-lon":
-				indexFieldOptions = arguments.indexField.getLatLonOptions();
+				indexFieldOptions = arguments.indexField.latLonOptions();
 				break;
 			case "literal":
-				indexFieldOptions = arguments.indexField.getLiteralOptions();
+				indexFieldOptions = arguments.indexField.literalOptions();
 				break;
 			case "literal-array":
-				indexFieldOptions = arguments.indexField.getLiteralArrayOptions();
+				indexFieldOptions = arguments.indexField.literalArrayOptions();
 				break;
 			case "text":
-				indexFieldOptions = arguments.indexField.getTextOptions();
+				indexFieldOptions = arguments.indexField.textOptions();
 				break;
 			case "text-array":
-				indexFieldOptions = arguments.indexField.getTextArrayOptions();
+				indexFieldOptions = arguments.indexField.textArrayOptions();
 				break;
 		}
 
-		querySetCell(arguments.q, "default_value", indexFieldOptions.getDefaultValue(), arguments.row);
-		querySetCell(arguments.q, "return", indexFieldOptions.getReturnEnabled(), arguments.row);
+		querySetCell(arguments.q, "default_value", indexFieldOptions.defaultValue(), arguments.row);
+		querySetCell(arguments.q, "return", indexFieldOptions.returnEnabled(), arguments.row);
 		querySetCell(arguments.q, "search", 1, arguments.row);
 		querySetCell(arguments.q, "facet", 0, arguments.row);
 		querySetCell(arguments.q, "sort", 0, arguments.row);
@@ -748,131 +795,159 @@ component {
 		querySetCell(arguments.q, "analysis_scheme", "", arguments.row);
 
 		if (not listfindnocase("text,text-array",type)){
-			querySetCell(arguments.q, "search", indexFieldOptions.getSearchEnabled(), arguments.row);
-			querySetCell(arguments.q, "facet", indexFieldOptions.getFacetEnabled(), arguments.row);
+			querySetCell(arguments.q, "search", indexFieldOptions.searchEnabled(), arguments.row);
+			querySetCell(arguments.q, "facet", indexFieldOptions.facetEnabled(), arguments.row);
 		}
 
 		if (listfindnocase("date,double,int,lat-lon,literal,text",type)){
-			querySetCell(arguments.q, "sort", indexFieldOptions.getSortEnabled(), arguments.row);
+			querySetCell(arguments.q, "sort", indexFieldOptions.sortEnabled(), arguments.row);
 		}
 
 		if (listfindnocase("text,text-array",type)){
-			querySetCell(arguments.q, "highlight", indexFieldOptions.getHighlightEnabled(), arguments.row);
-			querySetCell(arguments.q, "analysis_scheme", indexFieldOptions.getAnalysisScheme(), arguments.row);
+			querySetCell(arguments.q, "highlight", indexFieldOptions.highlightEnabled(), arguments.row);
+			querySetCell(arguments.q, "analysis_scheme", indexFieldOptions.analysisScheme(), arguments.row);
 		}
 	}
 
 	private any function createIndexFieldObject(required string field, required string type, required string default_value, required boolean return, required boolean search, required boolean facet, required boolean sort, required boolean highlight, required string analysis_scheme){
-		var indexField = createobject("java","com.amazonaws.services.cloudsearchv2.model.IndexField").init();
+		// AWS SDK 2.x - Use IndexField builder
+		var indexFieldBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.IndexField").builder()
+			.indexFieldName(arguments.field);
+		
+		// AWS SDK 2.x - IndexFieldType enum expects exact string values from API
+		// Convert "lat-lon" to "latlon" if needed, otherwise use as-is
+		var typeValue = arguments.type;
+		if (typeValue == "lat-lon") {
+			typeValue = "latlon";
+		}
+    
+    	var indexFieldType = createobject("java","software.amazon.awssdk.services.cloudsearch.model.IndexFieldType").fromValue(typeValue);
+		indexFieldBuilder.indexFieldType(indexFieldType);
+
 		var indexFieldOptions = {};
 
-		indexField.setIndexFieldName(arguments.field);
-		indexField.setIndexFieldType(arguments.type);
-
 		switch (arguments.type){
 			case "date":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.DateOptions").init();
+				var dateOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DateOptions").builder();
+				if (len(arguments.default_value)){
+					dateOptionsBuilder.defaultValue(arguments.default_value);
+				}
+				dateOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				dateOptionsBuilder.sortEnabled(javacast("boolean",arguments.sort));
+				indexFieldBuilder.dateOptions(dateOptionsBuilder.build());
 				break;
 			case "date-array":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.DateArrayOptions").init();
+				var dateArrayOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DateArrayOptions").builder();
+				if (len(arguments.default_value)){
+					dateArrayOptionsBuilder.defaultValue(arguments.default_value);
+				}
+				dateArrayOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				dateArrayOptionsBuilder.searchEnabled(javacast("boolean",arguments.search));
+				dateArrayOptionsBuilder.facetEnabled(javacast("boolean",arguments.facet));
+				indexFieldBuilder.dateArrayOptions(dateArrayOptionsBuilder.build());
 				break;
 			case "double":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.DoubleOptions").init();
+				var doubleOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DoubleOptions").builder();
+				if (len(arguments.default_value)){
+					doubleOptionsBuilder.defaultValue(javacast("double",arguments.default_value));
+				}
+				doubleOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				doubleOptionsBuilder.searchEnabled(javacast("boolean",arguments.search));
+				doubleOptionsBuilder.facetEnabled(javacast("boolean",arguments.facet));
+				doubleOptionsBuilder.sortEnabled(javacast("boolean",arguments.sort));
+				indexFieldBuilder.doubleOptions(doubleOptionsBuilder.build());
 				break;
 			case "double-array":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.DoubleArrayOptions").init();
+				var doubleArrayOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DoubleArrayOptions").builder();
+				if (len(arguments.default_value)){
+					doubleArrayOptionsBuilder.defaultValue(javacast("double",arguments.default_value));
+				}
+				doubleArrayOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				doubleArrayOptionsBuilder.searchEnabled(javacast("boolean",arguments.search));
+				doubleArrayOptionsBuilder.facetEnabled(javacast("boolean",arguments.facet));
+				indexFieldBuilder.doubleArrayOptions(doubleArrayOptionsBuilder.build());
 				break;
 			case "int":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.IntOptions").init();
+				var intOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.IntOptions").builder();
+				if (len(arguments.default_value)){
+					intOptionsBuilder.defaultValue(javacast("int",arguments.default_value));
+				}
+				intOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				intOptionsBuilder.searchEnabled(javacast("boolean",arguments.search));
+				intOptionsBuilder.facetEnabled(javacast("boolean",arguments.facet));
+				intOptionsBuilder.sortEnabled(javacast("boolean",arguments.sort));
+				indexFieldBuilder.intOptions(intOptionsBuilder.build());
 				break;
 			case "int-array":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.IntArrayOptions").init();
+				var intArrayOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.IntArrayOptions").builder();
+				if (len(arguments.default_value)){
+					intArrayOptionsBuilder.defaultValue(javacast("int",arguments.default_value));
+				}
+				intArrayOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				intArrayOptionsBuilder.searchEnabled(javacast("boolean",arguments.search));
+				intArrayOptionsBuilder.facetEnabled(javacast("boolean",arguments.facet));
+				indexFieldBuilder.intArrayOptions(intArrayOptionsBuilder.build());
 				break;
-			case "lat-lon":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.LatLonOptions").init();
-				break;
-			case "literal":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.LiteralOptions").init();
-				break;
-			case "literal-array":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.LiteralArrayOptions").init();
-				break;
-			case "text":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.TextOptions").init();
-				break;
-			case "text-array":
-				indexFieldOptions = createobject("java","com.amazonaws.services.cloudsearchv2.model.TextArrayOptions").init();
-				break;
-		}
-
-		if (len(arguments.default_value)){
-			if (listFindNoCase("double,double-array",arguments.type)){
-				indexFieldOptions.setDefaultValue(javacast("double",arguments.default_value));
-			}
-			else if (listFindNoCase("int,int-array",arguments.type)){
-				indexFieldOptions.setDefaultValue(javacast("int",arguments.default_value));
-			}
-			else{
-				indexFieldOptions.setDefaultValue(arguments.default_value);
-			}
-		}
-
-		indexFieldOptions.setReturnEnabled(javacast("boolean",arguments.return));
-
-		if (not listfindnocase("text,text-array",arguments.type)){
-			indexFieldOptions.setSearchEnabled(javacast("boolean",arguments.search));
-			indexFieldOptions.setFacetEnabled(javacast("boolean",arguments.facet));
-		}
-
-		if (listfindnocase("date,double,int,lat-lon,literal,text",arguments.type)){
-			indexFieldOptions.setSortEnabled(javacast("boolean",arguments.sort));
-		}
-
-		if (listfindnocase("text,text-array",arguments.type)){
-			indexFieldOptions.setHighlightEnabled(javacast("boolean",arguments.highlight));
-
-			if (len(arguments.analysis_scheme)){
-				indexFieldOptions.setAnalysisScheme(arguments.analysis_scheme);
-			}
-		}
-
-		switch (arguments.type){
-			case "date":
-				indexField.setDateOptions(indexFieldOptions);
-				break;
-			case "date-array":
-				indexField.setDateArrayOptions(indexFieldOptions);
-				break;
-			case "double":
-				indexField.setDoubleOptions(indexFieldOptions);
-				break;
-			case "double-array":
-				indexField.setDoubleArrayOptions(indexFieldOptions);
-				break;
-			case "int":
-				indexField.setIntOptions(indexFieldOptions);
-				break;
-			case "int-array":
-				indexField.setIntArrayOptions(indexFieldOptions);
-				break;
-			case "lat-lon":
-				indexField.setLatLonOptions(indexFieldOptions);
+			case "latlon": case "lat-lon":
+				var latLonOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.LatLonOptions").builder();
+				if (len(arguments.default_value)){
+					latLonOptionsBuilder.defaultValue(arguments.default_value);
+				}
+				latLonOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				latLonOptionsBuilder.searchEnabled(javacast("boolean",arguments.search));
+				latLonOptionsBuilder.facetEnabled(javacast("boolean",arguments.facet));
+				latLonOptionsBuilder.sortEnabled(javacast("boolean",arguments.sort));
+				indexFieldBuilder.latLonOptions(latLonOptionsBuilder.build());
 				break;
 			case "literal":
-				indexField.setLiteralOptions(indexFieldOptions);
+				var literalOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.LiteralOptions").builder();
+				if (len(arguments.default_value)){
+					literalOptionsBuilder.defaultValue(arguments.default_value);
+				}
+				literalOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				literalOptionsBuilder.searchEnabled(javacast("boolean",arguments.search));
+				literalOptionsBuilder.facetEnabled(javacast("boolean",arguments.facet));
+				literalOptionsBuilder.sortEnabled(javacast("boolean",arguments.sort));
+				indexFieldBuilder.literalOptions(literalOptionsBuilder.build());
 				break;
 			case "literal-array":
-				indexField.setLiteralArrayOptions(indexFieldOptions);
+				var literalArrayOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.LiteralArrayOptions").builder();
+				if (len(arguments.default_value)){
+					literalArrayOptionsBuilder.defaultValue(arguments.default_value);
+				}
+				literalArrayOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				literalArrayOptionsBuilder.searchEnabled(javacast("boolean",arguments.search));
+				literalArrayOptionsBuilder.facetEnabled(javacast("boolean",arguments.facet));
+				indexFieldBuilder.literalArrayOptions(literalArrayOptionsBuilder.build());
 				break;
 			case "text":
-				indexField.setTextOptions(indexFieldOptions);
+				var textOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.TextOptions").builder();
+				if (len(arguments.default_value)){
+					textOptionsBuilder.defaultValue(arguments.default_value);
+				}
+				textOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				textOptionsBuilder.sortEnabled(javacast("boolean",arguments.sort));
+				textOptionsBuilder.highlightEnabled(javacast("boolean",arguments.highlight));
+				if (len(arguments.analysis_scheme)){
+					textOptionsBuilder.analysisScheme(arguments.analysis_scheme);
+				}
+				indexFieldBuilder.textOptions(textOptionsBuilder.build());
 				break;
 			case "text-array":
-				indexField.setTextArrayOptions(indexFieldOptions);
+				var textArrayOptionsBuilder = createobject("java","software.amazon.awssdk.services.cloudsearch.model.TextArrayOptions").builder();
+				if (len(arguments.default_value)){
+					textArrayOptionsBuilder.defaultValue(arguments.default_value);
+				}
+				textArrayOptionsBuilder.returnEnabled(javacast("boolean",arguments.return));
+				textArrayOptionsBuilder.highlightEnabled(javacast("boolean",arguments.highlight));
+				if (len(arguments.analysis_scheme)){
+					textArrayOptionsBuilder.analysisScheme(arguments.analysis_scheme);
+				}
+				indexFieldBuilder.textArrayOptions(textArrayOptionsBuilder.build());
 				break;
 		}
 
-		return indexField;
+		return indexFieldBuilder.build();
 	}
 
 	public string function getRFC3339Date(required date d){
@@ -1411,6 +1486,7 @@ component {
 		    text = RemoveChars(text,i,1); // delete the redundant high chr from string.
 		    i = i+Len(tmp); // adjust the loop scan for the new chr placement, then continue the loop.
 		}
+		return text;
 	}
 
 	private string function RemoveExtraInvalidChars(required string text) {
@@ -1420,4 +1496,5 @@ component {
 		}
 		return text;
 	}
+
 }
