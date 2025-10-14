@@ -286,9 +286,18 @@ component {
 	/* CloudSearch API Wrappers */
 	public query function getDomains(){
 		var csClient = getClient();
-		
+		var domain = application.fapi.getConfig("cloudsearch","domain","");
+		var describeDomainsRequest = {};
 		// AWS SDK 2.x - Use DescribeDomainsRequest builder
-		var describeDomainsRequest = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DescribeDomainsRequest").builder().build();
+
+		if (len(domain)){
+			var domainNamesList = createObject("java", "java.util.ArrayList").init();
+			domainNamesList.add(domain);
+			describeDomainsRequest = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DescribeDomainsRequest").builder().domainNames(domainNamesList).build();
+		} else {
+			describeDomainsRequest = createobject("java","software.amazon.awssdk.services.cloudsearch.model.DescribeDomainsRequest").builder().build();
+		}
+
 		var describeDomainsResponse = csClient.describeDomains(describeDomainsRequest);
 		var domainResult = {};
 		var qResult = querynew("id,domain,created,processing,requires_index,deleted,instance_count,instance_type,endpoint", "varchar,varchar,bit,bit,bit,bit,integer,varchar,varchar");
