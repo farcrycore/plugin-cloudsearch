@@ -481,6 +481,13 @@ component {
 		try {
 			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
 		}
+		catch (java.lang.IllegalStateException e) {
+			// Connection pool has been shut down — reset the cached client and retry once
+			writeLog(file="cloudsearch", text="Domain client connection pool shut down — resetting and retrying uploadDocuments");
+			structDelete(this, "domainclient");
+			csdClient = getClient("domain", arguments.domain);
+			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
+		}
 		catch (com.amazonaws.services.cloudsearchdomain.model.DocumentServiceException e) {
 			if (len(arguments.documents) lt 500000)
 				throw(message=e.message, detail='{"domain":"#arguments.domain#", "documents":#arguments.documents#}');
@@ -636,6 +643,13 @@ component {
 		searchRequest.setSort(arguments.sort);
 
 		try {
+			searchResponse = csdClient.search(searchRequest);
+		}
+		catch (java.lang.IllegalStateException e) {
+			// Connection pool has been shut down — reset the cached client and retry once
+			writeLog(file="cloudsearch", text="Domain client connection pool shut down — resetting and retrying search");
+			structDelete(this, "domainclient");
+			csdClient = getClient("domain", arguments.domain);
 			searchResponse = csdClient.search(searchRequest);
 		}
 		catch (com.amazonaws.services.cloudsearchdomain.model.SearchException e) {
