@@ -482,10 +482,12 @@ component {
 			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
 		}
 		catch (java.lang.IllegalStateException e) {
-			// Connection pool has been shut down — reset the cached client and retry once
+			// Connection pool has been shut down — reset the cached client, re-open the stream, and retry once
 			writeLog(file="cloudsearch", text="Domain client connection pool shut down — resetting and retrying uploadDocuments");
 			structDelete(this, "domainclient");
 			csdClient = getClient("domain", arguments.domain);
+			inputStream = createobject("java","java.io.FileInputStream").init(documentFile);
+			uploadDocumentsRequest.setDocuments(inputStream);
 			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
 		}
 		catch (com.amazonaws.services.cloudsearchdomain.model.DocumentServiceException e) {
