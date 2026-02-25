@@ -522,6 +522,15 @@ component {
 		try {
 			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest, requestBody);
 		}
+		catch (java.lang.IllegalStateException e) {
+			// Connection pool has been shut down — reset the cached client, re-open the stream, and retry once
+			writeLog(file="cloudsearch", text="Domain client connection pool shut down — resetting and retrying uploadDocuments");
+			structDelete(this, "domainclient");
+			csdClient = getClient("domain", arguments.domain);
+			inputStream = createobject("java","java.io.FileInputStream").init(documentFile);
+			requestBody = createobject("java","software.amazon.awssdk.core.sync.RequestBody").fromInputStream(inputStream, getFileInfo(documentFile).size);
+			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest, requestBody);
+		}
 		catch (software.amazon.awssdk.services.cloudsearchdomain.model.DocumentServiceException e) {
 			if (len(arguments.documents) lt 500000)
 				throw(message=e.message, detail='{"domain":"#arguments.domain#", "documents":#arguments.documents#}');
@@ -682,6 +691,13 @@ component {
 		var searchRequest = searchRequestBuilder.build();
 
 		try {
+			searchResponse = csdClient.search(searchRequest);
+		}
+		catch (java.lang.IllegalStateException e) {
+			// Connection pool has been shut down — reset the cached client and retry once
+			writeLog(file="cloudsearch", text="Domain client connection pool shut down — resetting and retrying search");
+			structDelete(this, "domainclient");
+			csdClient = getClient("domain", arguments.domain);
 			searchResponse = csdClient.search(searchRequest);
 		}
 		catch (software.amazon.awssdk.services.cloudsearchdomain.model.SearchException e) {
