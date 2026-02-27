@@ -486,6 +486,7 @@ component {
 			writeLog(file="cloudsearch", text="Domain client connection pool shut down — resetting and retrying uploadDocuments");
 			structDelete(this, "domainclient");
 			csdClient = getClient("domain", arguments.domain);
+			inputStream.close();
 			inputStream = createobject("java","java.io.FileInputStream").init(documentFile);
 			uploadDocumentsRequest.setDocuments(inputStream);
 			uploadDocumentsResponse = csdClient.uploadDocuments(uploadDocumentsRequest);
