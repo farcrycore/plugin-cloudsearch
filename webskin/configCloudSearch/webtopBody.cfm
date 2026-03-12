@@ -83,7 +83,20 @@
 					<cfif len(application.fapi.getConfig("cloudsearch",thisfield,""))>
 						<span class="text-green">Ok</span>
 					<cfelse>
-						<span class="text-red">Not ok</span>
+						<cfif listFindNoCase("accessID,accessSecret", thisfield)>
+							<cftry>
+								<cfset credentialsProvider = createObject("java", "software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider").create() />
+								<!--- resolve credentials --->
+								<cfset credentials = credentialsProvider.resolveCredentials() />
+								<span class="text-orange">Ok - using IAM Role</span>
+
+							<cfcatch type="any">
+								<span class="text-red">Failed - using IAM Role</span>
+							</cfcatch>
+							</cftry>
+						<cfelse>
+							<span class="text-red">Not ok</span>
+						</cfif>
 					</cfif>
 				</td>
 			</tr>
