@@ -144,21 +144,25 @@ component {
 		if (len(accessID) AND len(accessSecret)) {
 			// Use explicit API key credentials
 			writeLog(file="cloudsearch",text="Using explicit AWS credentials (access key)");
+			systemOutput("[cloudsearch] Using explicit AWS credentials (access key)", true);
 			awsCredentials = createobject("java","software.amazon.awssdk.auth.credentials.AwsBasicCredentials").create(accessID, accessSecret);
 			credentialsProvider = createobject("java","software.amazon.awssdk.auth.credentials.StaticCredentialsProvider").create(awsCredentials);
 		} else {
 			// Use IAM role / default credentials chain
 			writeLog(file="cloudsearch",text="Using IAM role / default credentials chain");
+			systemOutput("[cloudsearch] Using IAM role / default credentials chain", true);
 			credentialsProvider = createobject("java","software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider").create();
 			useIAMRole = true;
 		}
 
 		if (arguments.type eq "config" and not structkeyexists(this, "client")){
 			writeLog(file="cloudsearch",text="Starting CloudSearch config client (#useIAMRole ? 'IAM role' : 'API key'#)");
+			systemOutput("[cloudsearch] Starting CloudSearch config client (#useIAMRole ? 'IAM role' : 'API key'#)", true);
 
 			// AWS SDK 2.x - Use Region.of() instead of Region.getRegion()
 			region = createobject("java","software.amazon.awssdk.regions.Region").of(regionname);
 			writeLog(file="cloudsearch",text="Setting region to [#region.toString()#]");
+			systemOutput("[cloudsearch] Setting region to [#region.toString()#]", true);
 
 			// AWS SDK 2.x - Use CloudSearchClient builder
 			tmpClient = createobject("java","software.amazon.awssdk.services.cloudsearch.CloudSearchClient").builder()
@@ -170,16 +174,18 @@ component {
 		}
 		if (arguments.type eq "domain" and not structkeyexists(this, "domainclient")){
 			writeLog(file="cloudsearch",text="Starting CloudSearch domain client (#useIAMRole ? 'IAM role' : 'API key'#)");
+			systemOutput("[cloudsearch] Starting CloudSearch domain client (#useIAMRole ? 'IAM role' : 'API key'#)", true);
 
 			region = createobject("java","software.amazon.awssdk.regions.Region").of(regionname);
 			endpoint = getDomainEndpoint(arguments.domain);
-			
+
 			// Ensure endpoint has https:// scheme
 			if (not findNoCase("https://", endpoint) and not findNoCase("http://", endpoint)) {
 				endpoint = "https://" & endpoint;
 			}
-			
+
 			writeLog(file="cloudsearch",text="Setting endpoint to [#endpoint#]");
+			systemOutput("[cloudsearch] Setting endpoint to [#endpoint#]", true);
 
 			// AWS SDK 2.x - Use CloudSearchDomainClient builder with custom endpoint
 			var endpointOverride = createobject("java","java.net.URI").create(endpoint);
