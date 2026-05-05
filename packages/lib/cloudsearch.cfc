@@ -1415,6 +1415,13 @@ component {
 	public string function getDomainEndpoint(required string domain, boolean bUseCache=true){
 		var qDomains = "";
 		var stDomain = {};
+		var configEndpoint = application.fapi.getConfig("cloudsearch","domainEndpoint","");
+
+		// Cross-account: describeDomains is account-scoped and won't see the domain,
+		// so prefer a configured endpoint when present.
+		if (len(configEndpoint)){
+			return configEndpoint;
+		}
 
 		if (not structKeyExists(this.domainEndpoints,arguments.bUseCache)){
 			qDomains = getDomains();
@@ -1432,7 +1439,6 @@ component {
 			throw(message="Invalid domain [#arguments.domain#]");
 		}
 	}
-
 
 	/* Logging */
 	public any function getRedis(){

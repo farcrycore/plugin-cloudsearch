@@ -6,11 +6,14 @@
 	<cfproperty name="region" type="string" required="false"
 		ftSeq="2" ftWizardStep="" ftFieldset="AWS" ftLabel="Region">
 
+	<cfproperty name="domainEndpoint" type="string" required="false"
+		ftSeq="3" ftWizardStep="" ftFieldset="AWS" ftLabel="Document Endpoint">
+
 	<cfproperty name="accessID" type="string" required="false"
-		ftSeq="3" ftWizardStep="" ftFieldset="AWS" ftLabel="Access ID">
+		ftSeq="4" ftWizardStep="" ftFieldset="AWS" ftLabel="Access ID">
 
 	<cfproperty name="accessSecret" type="string" required="false"
-		ftSeq="4" ftWizardStep="" ftFieldset="AWS" ftLabel="Access Secret">
+		ftSeq="5" ftWizardStep="" ftFieldset="AWS" ftLabel="Access Secret">
 
 
 	<cfproperty name="batchSize" type="integer" required="false" ftDefault="-1"
